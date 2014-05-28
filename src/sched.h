@@ -64,7 +64,7 @@ struct psched_entry {
 /* Prototypes */
 psched_t *psched_thread_init(void);
 psched_t *psched_sig_init(int sig);
-int psched_sig_destroy(psched_t *handler);
+int psched_destroy(psched_t *handler);
 pschedid_t psched_timestamp_arm(
 		psched_t *handler,
 		time_t trigger,

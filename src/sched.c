@@ -130,7 +130,7 @@ psched_t *psched_sig_init(int sig) {
 	return _init(sig, 0);
 }
 
-int psched_sig_destroy(psched_t *handler) {
+int psched_destroy(psched_t *handler) {
 	if (!handler->threaded) {
 		if (sigaction(handler->sig, &handler->sa_old, NULL) < 0)
 			return -1;

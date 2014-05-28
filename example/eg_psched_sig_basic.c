@@ -37,7 +37,7 @@ int main(void) {
 	/* Arm timer */
 	if (psched_timestamp_arm(h, time(NULL) + 5, 0, &timer_handler, "Hello! This timer has expired.") == (pschedid_t) - 1) {
 		fprintf(stderr, "psched_timestamp_arm(): %s\n", strerror(errno));
-		psched_sig_destroy(h);
+		psched_destroy(h);
 
 		return 1;
 	}
@@ -46,7 +46,7 @@ int main(void) {
 	do_work();
 
 	/* Free handler resources */
-	psched_sig_destroy(h);
+	psched_destroy(h);
 
 	/* All good */
 	return 0;
