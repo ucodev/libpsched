@@ -1,0 +1,33 @@
+1. About
+
+  Portable Scheduler Library (libpall).
+  Developed by Pedro A. Hortas (pah@ucodev.org).
+  Home page: http://www.ucodev.org
+
+
+2. Version
+
+  $ cat VERSION
+
+
+3. Documentation
+
+  $ cat doc/overview.txt
+
+
+4. Build and Install
+
+  # ./do
+  # ./install
+
+  Alternatively, to enable support for libfsma, do:
+
+  # ./do fsma
+  # ./install
+
+
+5. Examples
+
+  $ cd example
+  $ ./ex_psched_basic
+
