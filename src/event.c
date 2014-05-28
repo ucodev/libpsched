@@ -1,7 +1,7 @@
 /**
- * @file sig.c
+ * @file event.c
  * @brief Portable Scheduler Library (libpsched)
- *        Signals interface
+ *        Event Processing interface
  *
  * Date: 28-05-2014
  * 
@@ -24,12 +24,31 @@
  *
  */
 
+
+#include <stdlib.h>
 #include <signal.h>
+#include <time.h>
 
 #include "sched.h"
-#include "event.h"
 
-void sig_handler(int sig, siginfo_t *si, void *context) {
-	event_process((psched_t *) si->si_value.sival_ptr);
+void event_process(psched_t *handler) {
+	struct timespec tp_now;
+
+	if (clock_gettime(CLOCK_REALTIME, &tp_now) < 0) {
+		/* TODO: implement alternatives: gettimeofday(), time(), etc. */
+		abort();
+	}
+
+	if (handler->armed) {
+		if ((tp_now.tv_sec >= handler->armed->trigger.tv_sec) && (tp_now.tv_nsec >= handler->armed->trigger.tv_nsec)) {
+			handler->armed->routine(handler->armed->arg);
+		}
+	}
+
+	handler->s->del(handler->s, handler->armed);
+
+	handler->armed = NULL;
+
+	if (psched_update_timers(handler) < 0)
+		abort();
 }
-

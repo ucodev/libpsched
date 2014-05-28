@@ -31,6 +31,7 @@
 #include <stdint.h>
 #include <signal.h>
 #include <time.h>
+#include <pthread.h>
 
 #include <pall/cll.h>
 
@@ -41,6 +42,8 @@ typedef uintptr_t pschedid_t;
 typedef struct psched_handler {
 	timer_t timer;
 	int sig;
+	int threaded;
+	pthread_mutex_t event_mutex;
 	struct sigaction sa;
 	struct sigaction sa_old;
 	struct cll_handler *s;
@@ -59,6 +62,7 @@ struct psched_entry {
 #define psched_val(val) ((struct psched_entry [1]) { { val, } })
 
 /* Prototypes */
+psched_t *psched_thread_init(void);
 psched_t *psched_sig_init(int sig);
 int psched_sig_destroy(psched_t *handler);
 pschedid_t psched_timestamp_arm(

@@ -29,5 +29,6 @@
 5. Examples
 
   $ cd example
-  $ ./ex_psched_basic
+  $ ./eg_psched_sig_basic
+  $ ./eg_psched_thread_basic
 

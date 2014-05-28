@@ -31,12 +31,14 @@
 #include <stdint.h>
 #include <signal.h>
 #include <time.h>
+#include <pthread.h>
 
 #include <pall/cll.h>
 
 #include "mm.h"
 #include "sched.h"
 #include "sig.h"
+#include "thread.h"
 
 /* Statics */
 static int _cll_compare(const void *d1, const void *d2) {
@@ -55,9 +57,7 @@ static void _cll_destroy(void *data) {
 	mm_free(data);
 }
 
-
-/* Core */
-psched_t *psched_sig_init(int sig) {
+static psched_t *_init(int sig, int threaded) {
 	psched_t *handler = NULL;
 	struct sigevent sevp;
 
@@ -68,6 +68,16 @@ psched_t *psched_sig_init(int sig) {
 
 	memset(handler, 0, sizeof(psched_t));
 
+	if (threaded) {
+		if (thread_init(handler) < 0) {
+			mm_free(handler);
+
+			return NULL;
+		}
+
+		handler->threaded = 1;
+	}
+
 	if (!(handler->s = pall_cll_init(&_cll_compare, &_cll_destroy, NULL, NULL))) {
 		mm_free(handler);
 
@@ -76,9 +86,15 @@ psched_t *psched_sig_init(int sig) {
 
 	handler->s->set_config(handler->s, CONFIG_SEARCH_AUTO | CONFIG_INSERT_HEAD);
 
-	sevp.sigev_notify = SIGEV_SIGNAL;
-	sevp.sigev_signo = sig;
 	sevp.sigev_value.sival_ptr = handler;
+
+	if (threaded) {
+		sevp.sigev_notify = SIGEV_THREAD;
+		sevp.sigev_notify_function = &thread_handler;
+	} else {
+		sevp.sigev_notify = SIGEV_SIGNAL;
+		sevp.sigev_signo = sig;
+	}
 
 	if (timer_create(CLOCK_REALTIME, &sevp, &handler->timer) < 0) {
 		pall_cll_destroy(handler->s);
@@ -87,31 +103,50 @@ psched_t *psched_sig_init(int sig) {
 		return NULL;
 	}
 
-	handler->sig = sig;
-	handler->sa.sa_flags = SA_SIGINFO;
-	handler->sa.sa_sigaction = &sig_handler;
-	sigemptyset(&handler->sa.sa_mask);
+	if (!threaded) {
+		handler->sig = sig;
+		handler->sa.sa_flags = SA_SIGINFO;
+		handler->sa.sa_sigaction = &sig_handler;
+		sigemptyset(&handler->sa.sa_mask);
 
-	if (sigaction(sig, &handler->sa, &handler->sa_old) < 0) {
-		timer_delete(handler->timer);
-		pall_cll_destroy(handler->s);
-		mm_free(handler);
+		if (sigaction(sig, &handler->sa, &handler->sa_old) < 0) {
+			timer_delete(handler->timer);
+			pall_cll_destroy(handler->s);
+			mm_free(handler);
 
-		return NULL;
+			return NULL;
+		}
 	}
 
 	return handler;
 }
 
+/* Core */
+psched_t *psched_thread_init(void) {
+	return _init(0, 1);
+}
+
+psched_t *psched_sig_init(int sig) {
+	return _init(sig, 0);
+}
+
 int psched_sig_destroy(psched_t *handler) {
-	if (sigaction(handler->sig, &handler->sa_old, NULL) < 0)
-		return -1;
+	if (!handler->threaded) {
+		if (sigaction(handler->sig, &handler->sa_old, NULL) < 0)
+			return -1;
+	}
 
 	if (timer_delete(handler->timer) < 0)
 		return -1;
 
+	if (handler->threaded)
+		pthread_mutex_lock(&handler->event_mutex);
+
 	pall_cll_destroy(handler->s);
 	mm_free(handler);
+
+	if (handler->threaded)
+		pthread_mutex_unlock(&handler->event_mutex);
 
 	return 0;
 }
@@ -168,19 +203,29 @@ pschedid_t psched_timespec_arm(
 
 	handler->s->insert(handler->s, entry);
 
+	if (handler->threaded)
+		pthread_mutex_lock(&handler->event_mutex);
+
 	if (psched_update_timers(handler) < 0) {
 		handler->s->del(handler->s, entry);
 
 		if (psched_update_timers(handler) < 0)
 			abort();
 
+		if (handler->threaded)
+			pthread_mutex_unlock(&handler->event_mutex);
+
 		return -1;
 	}
+
+	if (handler->threaded)
+		pthread_mutex_unlock(&handler->event_mutex);
 
 	return entry->id;
 }
 
 int psched_disarm(psched_t *handler, pschedid_t id) {
+	int ret = 0;
 	struct psched_entry *entry = NULL;
 
 	if (!(entry = handler->s->search(handler->s, psched_val(id)))) {
@@ -196,7 +241,15 @@ int psched_disarm(psched_t *handler, pschedid_t id) {
 
 	handler->armed = NULL;
 
-	return psched_update_timers(handler);
+	if (handler->threaded)
+		pthread_mutex_lock(&handler->event_mutex);
+
+	ret = psched_update_timers(handler);
+
+	if (handler->threaded)
+		pthread_mutex_unlock(&handler->event_mutex);
+
+	return ret;
 }
 
 int psched_update_timers(psched_t *handler) {

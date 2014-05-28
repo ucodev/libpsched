@@ -4,7 +4,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <psched/sched.h>
+//#include <psched/sched.h>
+#include "sched.h"
 
 void *timer_handler(void *arg) {
 	char *str = arg;
@@ -27,7 +28,7 @@ int main(void) {
 	psched_t *h;
 
 	/* Initialize psched signal interface */
-	if (!(h = psched_sig_init(SIGUSR1))) {
+	if (!(h = psched_thread_init())) {
 		fprintf(stderr, "psched_signals_init(): %s\n", strerror(errno));
 
 		return 1;

@@ -1,7 +1,7 @@
 /**
- * @file sig.c
+ * @file thread.c
  * @brief Portable Scheduler Library (libpsched)
- *        Signals interface
+ *        Threading interface
  *
  * Date: 28-05-2014
  * 
@@ -25,11 +25,23 @@
  */
 
 #include <signal.h>
+#include <pthread.h>
 
 #include "sched.h"
 #include "event.h"
 
-void sig_handler(int sig, siginfo_t *si, void *context) {
-	event_process((psched_t *) si->si_value.sival_ptr);
+int thread_init(psched_t *handler) {
+	if (pthread_mutex_init(&handler->event_mutex, NULL))
+		return -1;
+
+	return 0;
+}
+
+void thread_handler(union sigval sv) {
+	psched_t *handler = sv.sival_ptr;
+
+	pthread_mutex_lock(&handler->event_mutex);
+	event_process(handler);
+	pthread_mutex_unlock(&handler->event_mutex);
 }
 

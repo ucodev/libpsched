@@ -1,13 +1,16 @@
 CC=`cat ../.compiler`
-CCFLAGS=-I../src/ -fstrict-aliasing -O2 -Wall -Werror
-LDFLAGS=../src/libpsched.so -lpall -lrt -s
+CCFLAGS=-I../src/ -fstrict-aliasing -O2 -Wall -Werror -pthread
+LDFLAGS=../src/libpsched.so -pthread -lpall -lrt -s
 ELFLAGS=`cat ../.elflags`
 
 all:
-	${CC} ${CCFLAGS} -c eg_psched_basic.c
-	${CC} -o eg_psched_basic eg_psched_basic.o ${LDFLAGS} ${ELFLAGS}
+	${CC} ${CCFLAGS} -c eg_psched_sig_basic.c
+	${CC} ${CCFLAGS} -c eg_psched_thread_basic.c
+	${CC} -o eg_psched_sig_basic eg_psched_sig_basic.o ${LDFLAGS} ${ELFLAGS}
+	${CC} -o eg_psched_thread_basic eg_psched_thread_basic.o ${LDFLAGS} ${ELFLAGS}
 
 clean:
 	rm -f *.o
-	rm -f eg_psched_basic
+	rm -f eg_psched_sig_basic
+	rm -f eg_psched_thread_basic
 

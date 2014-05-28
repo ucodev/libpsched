@@ -1,7 +1,7 @@
 /**
- * @file sig.c
+ * @file event.h
  * @brief Portable Scheduler Library (libpsched)
- *        Signals interface
+ *        Event processing interface
  *
  * Date: 28-05-2014
  * 
@@ -24,12 +24,12 @@
  *
  */
 
-#include <signal.h>
+
+#ifndef LIBPSCHED_EVENT_H
+#define LIBPSCHED_EVENT_H
 
 #include "sched.h"
-#include "event.h"
 
-void sig_handler(int sig, siginfo_t *si, void *context) {
-	event_process((psched_t *) si->si_value.sival_ptr);
-}
+void event_process(psched_t *handler);
 
+#endif
