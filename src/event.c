@@ -26,12 +26,16 @@
 
 
 #include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
 #include <signal.h>
 #include <time.h>
 
 #include "sched.h"
+#include "timespec.h"
 
 void event_process(psched_t *handler) {
+	struct psched_entry *entry = NULL;
 	struct timespec tp_now;
 
 	if (clock_gettime(CLOCK_REALTIME, &tp_now) < 0) {
@@ -45,6 +49,19 @@ void event_process(psched_t *handler) {
 		}
 	}
 
+	if (handler->armed->step.tv_sec || handler->armed->step.tv_nsec) {
+		/* Add step to trigger */
+		timespec_add(&handler->armed->trigger, &handler->armed->step);
+
+		if (!(entry = mm_alloc(sizeof(struct psched_entry))))
+			abort();
+
+		memcpy(entry, handler->armed, sizeof(struct psched_entry));
+		entry->id = (pschedid_t) (uintptr_t) entry;
+
+		handler->s->insert(handler->s, entry);
+	}
+
 	handler->s->del(handler->s, handler->armed);
 
 	handler->armed = NULL;
@@ -52,3 +69,4 @@ void event_process(psched_t *handler) {
 	if (psched_update_timers(handler) < 0)
 		abort();
 }
+

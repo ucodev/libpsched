@@ -191,6 +191,8 @@ pschedid_t psched_timespec_arm(
 	if (!(entry = mm_alloc(sizeof(struct psched_entry))))
 		return (pschedid_t) -1;
 
+	memset(entry, 0, sizeof(struct psched_entry));
+
 	memcpy(&entry->trigger, trigger, sizeof(struct timespec));
 
 	if (step) 
@@ -201,10 +203,10 @@ pschedid_t psched_timespec_arm(
 
 	entry->id = (pschedid_t) (uintptr_t) entry;
 
-	handler->s->insert(handler->s, entry);
-
 	if (handler->threaded)
 		pthread_mutex_lock(&handler->event_mutex);
+
+	handler->s->insert(handler->s, entry);
 
 	if (psched_update_timers(handler) < 0) {
 		handler->s->del(handler->s, entry);
@@ -233,6 +235,9 @@ int psched_disarm(psched_t *handler, pschedid_t id) {
 		return -1;
 	}
 
+	if (handler->threaded)
+		pthread_mutex_lock(&handler->event_mutex);
+
 	if (entry != handler->armed) {
 		handler->s->del(handler->s, entry);
 
@@ -240,9 +245,6 @@ int psched_disarm(psched_t *handler, pschedid_t id) {
 	}
 
 	handler->armed = NULL;
-
-	if (handler->threaded)
-		pthread_mutex_lock(&handler->event_mutex);
 
 	ret = psched_update_timers(handler);
 

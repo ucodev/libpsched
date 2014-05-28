@@ -11,7 +11,8 @@ all:
 	${CC} ${CCFLAGS} ${ECFLAGS} -c sig.c
 	${CC} ${CCFLAGS} ${ECFLAGS} -c sched.c
 	${CC} ${CCFLAGS} ${ECFLAGS} -c thread.c
-	${CC} ${LDFLAGS} -o ${TARGET} event.o mm.o sig.o sched.o thread.o ${ELFLAGS}
+	${CC} ${CCFLAGS} ${ECFLAGS} -c timespec.c
+	${CC} ${LDFLAGS} -o ${TARGET} event.o mm.o sig.o sched.o thread.o timespec.o ${ELFLAGS}
 
 clean:
 	rm -f *.o
