@@ -241,6 +241,9 @@ int psched_disarm(psched_t *handler, pschedid_t id) {
 	if (entry != handler->armed) {
 		handler->s->del(handler->s, entry);
 
+		if (handler->threaded)
+			pthread_mutex_unlock(&handler->event_mutex);
+
 		return 0;
 	}
 
