@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Scheduler interface
  *
- * Date: 28-05-2014
+ * Date: 29-05-2014
  * 
  * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -139,13 +139,11 @@ int psched_destroy(psched_t *handler) {
 	if (timer_delete(handler->timer) < 0)
 		return -1;
 
-	if (handler->threaded)
-		pthread_mutex_lock(&handler->event_mutex);
+	if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);
 
 	pall_cll_destroy(handler->s);
 
-	if (handler->threaded)
-		pthread_mutex_unlock(&handler->event_mutex);
+	if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
 
 	mm_free(handler);
 
@@ -204,8 +202,8 @@ pschedid_t psched_timespec_arm(
 
 	entry->id = (pschedid_t) (uintptr_t) entry;
 
-	if (handler->threaded)
-		pthread_mutex_lock(&handler->event_mutex);
+	/* Lock event mutex */
+	if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);
 
 	handler->s->insert(handler->s, entry);
 
@@ -215,14 +213,14 @@ pschedid_t psched_timespec_arm(
 		if (psched_update_timers(handler) < 0)
 			abort();
 
-		if (handler->threaded)
-			pthread_mutex_unlock(&handler->event_mutex);
+		/* Unlock event mutex */
+		if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
 
 		return -1;
 	}
 
-	if (handler->threaded)
-		pthread_mutex_unlock(&handler->event_mutex);
+	/* Unlock event mutex */
+	if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
 
 	return entry->id;
 }
@@ -236,14 +234,14 @@ int psched_disarm(psched_t *handler, pschedid_t id) {
 		return -1;
 	}
 
-	if (handler->threaded)
-		pthread_mutex_lock(&handler->event_mutex);
+	/* Lock event mutex */
+	if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);
 
 	if (entry != handler->armed) {
 		handler->s->del(handler->s, entry);
 
-		if (handler->threaded)
-			pthread_mutex_unlock(&handler->event_mutex);
+		/* Unlock event mutex */
+		if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
 
 		return 0;
 	}
@@ -252,8 +250,8 @@ int psched_disarm(psched_t *handler, pschedid_t id) {
 
 	ret = psched_update_timers(handler);
 
-	if (handler->threaded)
-		pthread_mutex_unlock(&handler->event_mutex);
+	/* Unlock event mutex */
+	if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
 
 	return ret;
 }
@@ -282,13 +280,12 @@ int psched_update_timers(psched_t *handler) {
 		}
 	}
 
+	/* Validate if there's at least one timer to be armed */
 	if (!handler->armed)
 		return 0;
 
 	its.it_value.tv_sec = handler->armed->trigger.tv_sec;
 	its.it_value.tv_nsec = handler->armed->trigger.tv_nsec;
-	its.it_interval.tv_sec = handler->armed->step.tv_sec;
-	its.it_interval.tv_nsec = handler->armed->step.tv_nsec;
 
 	if (timer_settime(handler->timer, TIMER_ABSTIME, &its, NULL) < 0)
 		return -1;

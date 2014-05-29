@@ -29,7 +29,7 @@ int main(void) {
 
 	/* Initialize psched signal interface */
 	if (!(h = psched_thread_init())) {
-		fprintf(stderr, "psched_signals_init(): %s\n", strerror(errno));
+		fprintf(stderr, "psched_thread_init(): %s\n", strerror(errno));
 
 		return 1;
 	}

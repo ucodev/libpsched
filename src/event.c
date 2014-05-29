@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Event Processing interface
  *
- * Date: 28-05-2014
+ * Date: 29-05-2014
  * 
  * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
  *
