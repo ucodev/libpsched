@@ -31,16 +31,24 @@
 #include <signal.h>
 #include <time.h>
 
+#include <sys/time.h>
+
 #include "sched.h"
 #include "timespec.h"
 
 void event_process(psched_t *handler) {
 	struct psched_entry *entry = NULL;
 	struct timespec tp_now;
+	struct timeval tv;
 
 	if (clock_gettime(CLOCK_REALTIME, &tp_now) < 0) {
-		/* TODO: implement alternatives: gettimeofday(), time(), etc. */
-		abort();
+		if (gettimeofday(&tv, NULL) < 0) {
+			tp_now.tv_sec = tv.tv_sec;
+			tp_now.tv_nsec = tv.tv_usec * 1000;
+		} else {
+			tp_now.tv_sec = time(NULL);
+			tp_now.tv_nsec = 0;
+		}
 	}
 
 	if (handler->armed) {

@@ -143,10 +143,11 @@ int psched_destroy(psched_t *handler) {
 		pthread_mutex_lock(&handler->event_mutex);
 
 	pall_cll_destroy(handler->s);
-	mm_free(handler);
 
 	if (handler->threaded)
 		pthread_mutex_unlock(&handler->event_mutex);
+
+	mm_free(handler);
 
 	return 0;
 }
