@@ -139,12 +139,15 @@ int psched_destroy(psched_t *handler) {
 	if (timer_delete(handler->timer) < 0)
 		return -1;
 
+	/* Lock event mutex */
 	if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);
 
 	pall_cll_destroy(handler->s);
 
+	/* Unlock event mutex */
 	if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
 
+	/* FIXME: wait for any event handlers to exit before free()'ing the handler */
 	mm_free(handler);
 
 	return 0;
