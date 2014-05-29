@@ -54,7 +54,7 @@ struct psched_entry {
 	pschedid_t id;
 	struct timespec trigger;
 	struct timespec step;
-	void *(*routine) (void *);
+	void (*routine) (void *);
 	void *arg;
 };
 
@@ -69,13 +69,13 @@ pschedid_t psched_timestamp_arm(
 		psched_t *handler,
 		time_t trigger,
 		time_t step,
-		void *(*routine) (void *),
+		void (*routine) (void *),
 		void *arg);
 pschedid_t psched_timespec_arm(
 		psched_t *handler,
 		struct timespec *trigger,
 		struct timespec *step,
-		void *(*routine) (void *),
+		void (*routine) (void *),
 		void *arg);
 int psched_disarm(psched_t *handler, pschedid_t id);
 int psched_update_timers(psched_t *handler);

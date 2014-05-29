@@ -157,7 +157,7 @@ pschedid_t psched_timestamp_arm(
 		psched_t *handler,
 		time_t trigger,
 		time_t step,
-		void *(*routine) (void *),
+		void (*routine) (void *),
 		void *arg)
 {
 	struct timespec ts_trigger, ts_step;
@@ -175,7 +175,7 @@ pschedid_t psched_timespec_arm(
 		psched_t *handler,
 		struct timespec *trigger,
 		struct timespec *step,
-		void *(*routine) (void *),
+		void (*routine) (void *),
 		void *arg)
 {
 	struct psched_entry *entry = NULL;

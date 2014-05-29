@@ -7,12 +7,10 @@
 //#include <psched/sched.h>
 #include "sched.h"
 
-void *timer_handler(void *arg) {
+void timer_handler(void *arg) {
 	char *str = arg;
 
 	printf("[Timer]: %s\n", str);
-
-	return NULL;
 }
 
 void do_work(void) {
