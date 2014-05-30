@@ -5,17 +5,24 @@
   Home page: http://www.ucodev.org
 
 
-2. Version
+2. Briefing
+
+  The libpsched offers a simple and easy-to-use interface to schedule routines to be executed at a specific time.
+  Depending on the operating system and hardware, the clock can achieve nanoseconds precision.
+  It's thread-safe, supports real-time clock by default and implements both signaling and threading notification options.
+
+
+3. Version
 
   $ cat VERSION
 
 
-3. Documentation
+4. Documentation
 
   $ cat doc/overview.txt
 
 
-4. Build and Install
+5. Build and Install
 
   # ./do
   # ./install
@@ -26,7 +33,7 @@
   # ./install
 
 
-5. Examples
+6. Examples
 
   $ cd example
   $ ./eg_psched_sig_basic

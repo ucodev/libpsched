@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Scheduler interface header
  *
- * Date: 28-05-2014
+ * Date: 30-05-2014
  * 
  * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -43,6 +43,7 @@ typedef struct psched_handler {
 	timer_t timer;
 	int sig;
 	int threaded;
+	int destroy;
 	pthread_mutex_t event_mutex;
 	struct sigaction sa;
 	struct sigaction sa_old;
