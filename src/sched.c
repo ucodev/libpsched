@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Scheduler interface
  *
- * Date: 30-05-2014
+ * Date: 01-06-2014
  * 
  * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -147,7 +147,7 @@ int psched_destroy(psched_t *handler) {
 	/* Unlock event mutex */
 	if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
 
-	/* Set this handler to be destroyed by psched_update_timers() when execution queue is empty */
+	/* Set this handler to be destroyed by event handling function when execution queue is empty */
 	handler->destroy = 1;
 
 	return 0;
@@ -284,13 +284,8 @@ int psched_update_timers(psched_t *handler) {
 	}
 
 	/* Validate if there's at least one timer to be armed */
-	if (!handler->armed) {
-		/* Check if handler is set to be destructed */
-		if (handler->destroy)
-			mm_free(handler);
-
+	if (!handler->armed)
 		return 0;
-	}
 
 	its.it_value.tv_sec = handler->armed->trigger.tv_sec;
 	its.it_value.tv_nsec = handler->armed->trigger.tv_nsec;

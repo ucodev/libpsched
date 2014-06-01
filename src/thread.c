@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Threading interface
  *
- * Date: 29-05-2014
+ * Date: 01-06-2014
  * 
  * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -29,6 +29,7 @@
 
 #include "sched.h"
 #include "event.h"
+#include "mm.h"
 
 int thread_init(psched_t *handler) {
 	if (pthread_mutex_init(&handler->event_mutex, NULL))
@@ -47,5 +48,9 @@ void thread_handler(union sigval sv) {
 
 	/* Unlock event mutex */
 	pthread_mutex_unlock(&handler->event_mutex);
+
+	/* Check if handler is set to be destroyed */
+	if (!handler->armed && handler->destroy)
+		mm_free(handler);
 }
 
