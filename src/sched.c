@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Scheduler interface
  *
- * Date: 01-06-2014
+ * Date: 11-06-2014
  * 
  * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -157,10 +157,11 @@ pschedid_t psched_timestamp_arm(
 		psched_t *handler,
 		time_t trigger,
 		time_t step,
+		time_t expire,
 		void (*routine) (void *),
 		void *arg)
 {
-	struct timespec ts_trigger, ts_step;
+	struct timespec ts_trigger, ts_step, ts_expire;
 
 	ts_trigger.tv_sec = trigger;
 	ts_trigger.tv_nsec = 0;
@@ -168,13 +169,17 @@ pschedid_t psched_timestamp_arm(
 	ts_step.tv_sec = step;
 	ts_step.tv_nsec = 0;
 
-	return psched_timespec_arm(handler, &ts_trigger, &ts_step, routine, arg);
+	ts_expire.tv_sec = expire;
+	ts_expire.tv_nsec = 0;
+
+	return psched_timespec_arm(handler, &ts_trigger, &ts_step, &ts_expire, routine, arg);
 }
 
 pschedid_t psched_timespec_arm(
 		psched_t *handler,
 		struct timespec *trigger,
 		struct timespec *step,
+		struct timespec *expire,
 		void (*routine) (void *),
 		void *arg)
 {
@@ -199,6 +204,9 @@ pschedid_t psched_timespec_arm(
 
 	if (step) 
 		memcpy(&entry->step, step, sizeof(struct timespec));
+
+	if (expire)
+		memcpy(&entry->expire, expire, sizeof(struct timespec));
 
 	entry->routine = routine;
 	entry->arg = arg;
@@ -275,10 +283,10 @@ int psched_update_timers(psched_t *handler) {
 	for (handler->s->rewind(handler->s, 0); (entry = handler->s->iterate(handler->s)); ) {
 		if (!handler->armed) {
 			handler->armed = entry;
-		} else if (entry->trigger.tv_sec > handler->armed->trigger.tv_sec) {
+		} else if (entry->trigger.tv_sec < handler->armed->trigger.tv_sec) {
 			handler->armed = entry;
 		} else if (entry->trigger.tv_sec == handler->armed->trigger.tv_sec) {
-			if (entry->trigger.tv_nsec > handler->armed->trigger.tv_nsec)
+			if (entry->trigger.tv_nsec < handler->armed->trigger.tv_nsec)
 				handler->armed = entry;
 		}
 	}

@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Timespec interface header
  *
- * Date: 28-05-2014
+ * Date: 11-06-2014
  * 
  * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -32,5 +32,6 @@
 
 /* Prototypes */
 void timespec_add(struct timespec *dest, const struct timespec *src);
+int timespec_cmp(const struct timespec *ts1, const struct timespec *ts2);
 
 #endif

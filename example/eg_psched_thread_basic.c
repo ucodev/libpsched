@@ -32,8 +32,16 @@ int main(void) {
 		return 1;
 	}
 
-	/* Arm timer */
-	if (psched_timestamp_arm(h, time(NULL) + 5, 0, &timer_handler, "Hello! This timer has expired.") == (pschedid_t) - 1) {
+	/* Arm the first timer */
+	if (psched_timestamp_arm(h, time(NULL) + 5, 0, 0, &timer_handler, "Hello! This timer has expired.") == (pschedid_t) - 1) {
+		fprintf(stderr, "psched_timestamp_arm(): %s\n", strerror(errno));
+		psched_destroy(h);
+
+		return 1;
+	}
+
+	/* Arm a second timer */
+	if (psched_timestamp_arm(h, time(NULL) + 7, 0, 0, &timer_handler, "Hello again! This timer also expired.") == (pschedid_t) - 1) {
 		fprintf(stderr, "psched_timestamp_arm(): %s\n", strerror(errno));
 		psched_destroy(h);
 

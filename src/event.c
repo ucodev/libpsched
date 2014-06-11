@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Event Processing interface
  *
- * Date: 29-05-2014
+ * Date: 11-06-2014
  * 
  * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -51,26 +51,33 @@ void event_process(psched_t *handler) {
 		}
 	}
 
-	if (handler->armed) {
-		if ((tp_now.tv_sec >= handler->armed->trigger.tv_sec) && (tp_now.tv_nsec >= handler->armed->trigger.tv_nsec)) {
-			handler->armed->routine(handler->armed->arg);
+	if (handler->armed &&
+		(timespec_cmp(&tp_now, &handler->armed->trigger) >= 0) &&
+		(
+			(!handler->armed->expire.tv_sec && !handler->armed->expire.tv_nsec) ||
+			(
+				(handler->armed->expire.tv_sec || handler->armed->expire.tv_nsec) &&
+				(timespec_cmp(&tp_now, &handler->armed->expire) < 0)
+			)
+		)
+	) {
+		handler->armed->routine(handler->armed->arg);
+
+		if ((handler->armed->step.tv_sec || handler->armed->step.tv_nsec)) {
+			/* Add step to trigger */
+			timespec_add(&handler->armed->trigger, &handler->armed->step);
+
+			if (!(entry = mm_alloc(sizeof(struct psched_entry))))
+				abort();
+
+			memcpy(entry, handler->armed, sizeof(struct psched_entry));
+			entry->id = (pschedid_t) (uintptr_t) entry;
+
+			handler->s->insert(handler->s, entry);
 		}
+
+		handler->s->del(handler->s, handler->armed);
 	}
-
-	if (handler->armed->step.tv_sec || handler->armed->step.tv_nsec) {
-		/* Add step to trigger */
-		timespec_add(&handler->armed->trigger, &handler->armed->step);
-
-		if (!(entry = mm_alloc(sizeof(struct psched_entry))))
-			abort();
-
-		memcpy(entry, handler->armed, sizeof(struct psched_entry));
-		entry->id = (pschedid_t) (uintptr_t) entry;
-
-		handler->s->insert(handler->s, entry);
-	}
-
-	handler->s->del(handler->s, handler->armed);
 
 	handler->armed = NULL;
 
