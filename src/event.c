@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Event Processing interface
  *
- * Date: 11-06-2014
+ * Date: 12-06-2014
  * 
  * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -51,32 +51,31 @@ void event_process(psched_t *handler) {
 		}
 	}
 
-	if (handler->armed &&
-		(timespec_cmp(&tp_now, &handler->armed->trigger) >= 0) &&
-		(
-			(!handler->armed->expire.tv_sec && !handler->armed->expire.tv_nsec) ||
-			(
-				(handler->armed->expire.tv_sec || handler->armed->expire.tv_nsec) &&
-				(timespec_cmp(&tp_now, &handler->armed->expire) < 0)
-			)
-		)
-	) {
-		handler->armed->routine(handler->armed->arg);
+	if (handler->armed) {
+		if ((handler->armed->expire.tv_sec || handler->armed->expire.tv_nsec) && (timespec_cmp(&tp_now, &handler->armed->expire) >= 0))
+			handler->armed->expired = 1;
 
-		if ((handler->armed->step.tv_sec || handler->armed->step.tv_nsec)) {
-			/* Add step to trigger */
-			timespec_add(&handler->armed->trigger, &handler->armed->step);
+		if ((timespec_cmp(&tp_now, &handler->armed->trigger) >= 0) && !handler->armed->expired) {
+			handler->armed->routine(handler->armed->arg);
 
-			if (!(entry = mm_alloc(sizeof(struct psched_entry))))
-				abort();
+			if ((handler->armed->step.tv_sec || handler->armed->step.tv_nsec)) {
+				/* Add step to trigger */
+				timespec_add(&handler->armed->trigger, &handler->armed->step);
 
-			memcpy(entry, handler->armed, sizeof(struct psched_entry));
-			entry->id = (pschedid_t) (uintptr_t) entry;
+				if (!(entry = mm_alloc(sizeof(struct psched_entry))))
+					abort();
 
-			handler->s->insert(handler->s, entry);
+				memcpy(entry, handler->armed, sizeof(struct psched_entry));
+				entry->id = (pschedid_t) (uintptr_t) entry;
+
+				handler->s->insert(handler->s, entry);
+			}
+
+			handler->s->del(handler->s, handler->armed);
+		} else if (handler->armed->expired) {
+			/* Expired entries should be removed */
+			handler->s->del(handler->s, handler->armed);
 		}
-
-		handler->s->del(handler->s, handler->armed);
 	}
 
 	handler->armed = NULL;
