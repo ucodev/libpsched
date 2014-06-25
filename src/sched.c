@@ -267,14 +267,24 @@ int psched_disarm(psched_t *handler, pschedid_t id) {
 	return ret;
 }
 
-int psched_search(psched_t *handler, pschedid_t id, struct psched_entry **entry) {
+int psched_search(
+		psched_t *handler,
+		pschedid_t id,
+		struct timespec *trigger,
+		struct timespec *step,
+		struct timespec *expire) {
+	struct psched_entry *entry = NULL;
 	int ret = -1;
 
 	/* Lock event mutex */
 	if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);
 
-	for (handler->s->rewind(handler->s, 0); (*entry = handler->s->iterate(handler->s)); ) {
-		if ((*entry)->id == id) {
+	for (handler->s->rewind(handler->s, 0); (entry = handler->s->iterate(handler->s)); ) {
+		if (entry->id == id) {
+			memcpy(trigger, &entry->trigger, sizeof(struct timespec));
+			memcpy(step, &entry->step, sizeof(struct timespec));
+			memcpy(expire, &entry->expire, sizeof(struct timespec));
+
 			ret = 0;
 			break;
 		}

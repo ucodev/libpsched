@@ -83,7 +83,12 @@ pschedid_t psched_timespec_arm(
 		void (*routine) (void *),
 		void *arg);
 int psched_disarm(psched_t *handler, pschedid_t id);
-int psched_search(psched_t *handler, pschedid_t id, struct psched_entry **entry);
+int psched_search(
+		psched_t *handler,
+		pschedid_t id,
+		struct timespec *trigger,
+		struct timespec *step,
+		struct timespec *expire);
 int psched_update_timers(psched_t *handler);
 
 #endif
