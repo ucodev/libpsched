@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Scheduler interface header
  *
- * Date: 12-06-2014
+ * Date: 25-06-2014
  * 
  * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -83,6 +83,7 @@ pschedid_t psched_timespec_arm(
 		void (*routine) (void *),
 		void *arg);
 int psched_disarm(psched_t *handler, pschedid_t id);
+int psched_search(psched_t *handler, pschedid_t id, struct psched_entry **entry);
 int psched_update_timers(psched_t *handler);
 
 #endif

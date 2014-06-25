@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Scheduler interface
  *
- * Date: 12-06-2014
+ * Date: 25-06-2014
  * 
  * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -265,6 +265,25 @@ int psched_disarm(psched_t *handler, pschedid_t id) {
 	if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
 
 	return ret;
+}
+
+int psched_search(psched_t *handler, pschedid_t id, struct psched_entry **entry) {
+	int ret = -1;
+
+	/* Lock event mutex */
+	if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);
+
+	for (handler->s->rewind(handler->s, 0); (*entry = handler->s->iterate(handler->s)); ) {
+		if ((*entry)->id == id) {
+			ret = 0;
+			break;
+		}
+	}
+
+	/* Unlock event mutex */
+	if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
+
+	return -1;
 }
 
 int psched_update_timers(psched_t *handler) {
