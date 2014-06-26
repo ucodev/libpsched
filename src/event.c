@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Event Processing interface
  *
- * Date: 12-06-2014
+ * Date: 26-06-2014
  * 
  * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -30,6 +30,7 @@
 #include <stdint.h>
 #include <signal.h>
 #include <time.h>
+#include <pthread.h>
 
 #include <sys/time.h>
 
@@ -51,36 +52,68 @@ void event_process(psched_t *handler) {
 		}
 	}
 
-	if (handler->armed) {
-		if ((handler->armed->expire.tv_sec || handler->armed->expire.tv_nsec) && (timespec_cmp(&tp_now, &handler->armed->expire) >= 0))
-			handler->armed->expired = 1;
+	/* Lock event mutex */
+	if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);
 
-		if ((timespec_cmp(&tp_now, &handler->armed->trigger) >= 0) && !handler->armed->expired) {
-			handler->armed->routine(handler->armed->arg);
+	entry = handler->armed;
 
-			if ((handler->armed->step.tv_sec || handler->armed->step.tv_nsec)) {
+	/* If exists, mark this entry as 'in progress' */
+	if (entry) {
+		entry->in_progress = 1;
+
+		handler->armed = NULL;
+	}
+
+	/* Unlock event mutex */
+	if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
+
+	/* If there's an armed entry... */
+	if (entry) {
+		/* Validate if entry isn't expired */
+		if ((entry->expire.tv_sec || entry->expire.tv_nsec) && (timespec_cmp(&tp_now, &entry->expire) >= 0))
+			entry->expired = 1;
+
+		/* If no step defined or if expired, set it to be removed */
+		if (entry->expired) {
+			entry->to_remove = 1;
+		} else if ((timespec_cmp(&tp_now, &entry->trigger) >= 0)) {
+			/* Lock event mutex */
+			if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);
+
+			/* If the entry is recurrent... */
+			if ((entry->step.tv_sec || entry->step.tv_nsec)) {
 				/* Add step to trigger */
-				timespec_add(&handler->armed->trigger, &handler->armed->step);
-
-				if (!(entry = mm_alloc(sizeof(struct psched_entry))))
-					abort();
-
-				memcpy(entry, handler->armed, sizeof(struct psched_entry));
-				entry->id = (pschedid_t) (uintptr_t) entry;
-
-				handler->s->insert(handler->s, entry);
+				timespec_add(&entry->trigger, &entry->step);
+				entry->in_progress = 0;
+			} else {
+				/* Otherwise, mark it to be removed from scheduling list */
+				entry->to_remove = 1;
 			}
 
-			handler->s->del(handler->s, handler->armed);
-		} else if (handler->armed->expired) {
-			/* Expired entries should be removed */
-			handler->s->del(handler->s, handler->armed);
+			/* Unlock event mutex */
+			if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
+
+			entry->routine(entry->arg);
+		}
+
+		if (entry->to_remove) {
+			/* Lock event mutex */
+			if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);
+
+			handler->s->del(handler->s, entry);
+
+			/* Unlock event mutex */
+			if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
 		}
 	}
 
-	handler->armed = NULL;
+	/* Lock event mutex */
+	if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);
 
 	if (psched_update_timers(handler) < 0)
 		abort();
+
+	/* Unlock event mutex */
+	if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
 }
 

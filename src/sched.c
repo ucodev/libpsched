@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Scheduler interface
  *
- * Date: 25-06-2014
+ * Date: 26-06-2014
  * 
  * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -240,14 +240,16 @@ int psched_disarm(psched_t *handler, pschedid_t id) {
 	int ret = 0;
 	struct psched_entry *entry = NULL;
 
+	/* Lock event mutex */
+	if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);
+
+	/* Search for scheduling entry */
 	if (!(entry = handler->s->search(handler->s, psched_val(id)))) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	/* Lock event mutex */
-	if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);
-
+	/* Check if the found entry is currently armed */
 	if (entry != handler->armed) {
 		handler->s->del(handler->s, entry);
 
@@ -279,21 +281,22 @@ int psched_search(
 	/* Lock event mutex */
 	if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);
 
-	for (handler->s->rewind(handler->s, 0); (entry = handler->s->iterate(handler->s)); ) {
-		if (entry->id == id) {
-			memcpy(trigger, &entry->trigger, sizeof(struct timespec));
-			memcpy(step, &entry->step, sizeof(struct timespec));
-			memcpy(expire, &entry->expire, sizeof(struct timespec));
-
-			ret = 0;
-			break;
-		}
-	}
+	/* Search for scheduling entry */
+	entry = handler->s->search(handler->s, psched_val(id));
 
 	/* Unlock event mutex */
 	if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
 
-	return -1;
+	/* If the entry was found, update trigger, step and expire arguments */
+	if (entry && !entry->to_remove) {
+		memcpy(trigger, &entry->trigger, sizeof(struct timespec));
+		memcpy(step, &entry->step, sizeof(struct timespec));
+		memcpy(expire, &entry->expire, sizeof(struct timespec));
+
+		ret = 0;
+	}
+
+	return ret;
 }
 
 int psched_update_timers(psched_t *handler) {
@@ -303,6 +306,7 @@ int psched_update_timers(psched_t *handler) {
 	memset(&its, 0, sizeof(struct itimerspec));
 
 	if (handler->armed) {
+		/* Disarm timer */
 		if (timer_settime(handler->timer, TIMER_ABSTIME, &its, NULL) < 0)
 			return -1;
 
@@ -310,6 +314,9 @@ int psched_update_timers(psched_t *handler) {
 	}
 
 	for (handler->s->rewind(handler->s, 0); (entry = handler->s->iterate(handler->s)); ) {
+		if (entry->in_progress)
+			continue;
+
 		if (!handler->armed) {
 			handler->armed = entry;
 		} else if (entry->trigger.tv_sec < handler->armed->trigger.tv_sec) {
