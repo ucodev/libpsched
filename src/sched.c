@@ -269,6 +269,11 @@ int psched_disarm(psched_t *handler, pschedid_t id) {
 	return ret;
 }
 
+/**
+ * NOTE: This function does not grant that after it returns the entry still exists, unless it is called inside the
+ *       notification routine, invoked by timer expiration.
+ *
+ */
 int psched_search(
 		psched_t *handler,
 		pschedid_t id,
@@ -284,9 +289,6 @@ int psched_search(
 	/* Search for scheduling entry */
 	entry = handler->s->search(handler->s, psched_val(id));
 
-	/* Unlock event mutex */
-	if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
-
 	/* If the entry was found, update trigger, step and expire arguments */
 	if (entry && !entry->to_remove) {
 		memcpy(trigger, &entry->trigger, sizeof(struct timespec));
@@ -295,6 +297,9 @@ int psched_search(
 
 		ret = 0;
 	}
+
+	/* Unlock event mutex */
+	if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
 
 	return ret;
 }
