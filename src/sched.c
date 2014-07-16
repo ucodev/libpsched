@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Scheduler interface
  *
- * Date: 26-06-2014
+ * Date: 16-07-2014
  * 
  * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -238,7 +238,10 @@ pschedid_t psched_timespec_arm(
 
 int psched_disarm(psched_t *handler, pschedid_t id) {
 	int ret = 0;
+	struct itimerspec its;
 	struct psched_entry *entry = NULL;
+
+	memset(&its, 0, sizeof(struct itimerspec));
 
 	/* Lock event mutex */
 	if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);
@@ -259,7 +262,17 @@ int psched_disarm(psched_t *handler, pschedid_t id) {
 		return 0;
 	}
 
+	/* NOTE: If the entry to be delete is armed, we need to disarm the timer and reset the handler->armed pointer
+	 * before we can delete it from the handlers list.
+	 */
+
+	/* Disarm timer */
+	if (timer_settime(handler->timer, TIMER_ABSTIME, &its, NULL) < 0)
+		return -1;
+
 	handler->armed = NULL;
+
+	handler->s->del(handler->s, entry);
 
 	ret = psched_update_timers(handler);
 
