@@ -248,6 +248,9 @@ int psched_disarm(psched_t *handler, pschedid_t id) {
 
 	/* Search for scheduling entry */
 	if (!(entry = handler->s->search(handler->s, psched_val(id)))) {
+		/* Unlock event mutex */
+		if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
+
 		errno = EINVAL;
 		return -1;
 	}
