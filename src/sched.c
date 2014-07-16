@@ -267,8 +267,12 @@ int psched_disarm(psched_t *handler, pschedid_t id) {
 	 */
 
 	/* Disarm timer */
-	if (timer_settime(handler->timer, TIMER_ABSTIME, &its, NULL) < 0)
+	if (timer_settime(handler->timer, TIMER_ABSTIME, &its, NULL) < 0) {
+		/* Unlock event mutex */
+		if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
+
 		return -1;
+	}
 
 	handler->armed = NULL;
 
