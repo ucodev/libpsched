@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Scheduler interface
  *
- * Date: 16-07-2014
+ * Date: 27-07-2014
  * 
  * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -151,6 +151,10 @@ int psched_destroy(psched_t *handler) {
 	handler->destroy = 1;
 
 	return 0;
+}
+
+void psched_handler_destroy(psched_t *handler) {
+	mm_free(handler);
 }
 
 pschedid_t psched_timestamp_arm(
