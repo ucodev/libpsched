@@ -31,10 +31,10 @@ if [ $? -ne 0 ]; then
 	exit 1;
 fi
 
-cp src/*.h /usr/include/psched/
+cp include/*.h /usr/include/psched/
 
 if [ $? -ne 0 ]; then
-	echo "Failed to copy src/*.h to /usr/include/psched"
+	echo "Failed to copy include/*.h to /usr/include/psched"
 	exit 1;
 fi
 

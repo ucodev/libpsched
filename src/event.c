@@ -3,9 +3,9 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Event Processing interface
  *
- * Date: 26-06-2014
+ * Date: 24-01-2015
  * 
- * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
+ * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
  * This file is part of libpsched.
  *
@@ -82,8 +82,10 @@ void event_process(psched_t *handler) {
 
 			/* If the entry is recurrent... */
 			if ((entry->step.tv_sec || entry->step.tv_nsec)) {
-				/* Add step to trigger */
-				timespec_add(&entry->trigger, &entry->step);
+				/* Add step to trigger while its lesser than current time */
+				do timespec_add(&entry->trigger, &entry->step);
+				while (timespec_cmp(&tp_now, &entry->trigger) >= 0);
+
 				entry->in_progress = 0;
 			} else {
 				/* Otherwise, mark it to be removed from scheduling list */
