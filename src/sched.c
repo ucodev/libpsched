@@ -238,7 +238,7 @@ pschedid_t psched_timespec_arm(
 
 	/* Check if a fatal error occurred */
 	if (handler->fatal) {
-		errno = EUCLEAN; /* A clean restart of the library is required */
+		errno = ECANCELED; /* A clean restart of the library is required */
 		return -1;
 	}
 
@@ -286,7 +286,7 @@ pschedid_t psched_timespec_arm(
 		/* Unlock event mutex */
 		if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
 
-		errno = EUCLEAN;
+		errno = ECANCELED;
 
 		return -1;
 	}
@@ -304,7 +304,7 @@ int psched_disarm(psched_t *handler, pschedid_t id) {
 
 	/* Check if a fatal error occurred */
 	if (handler->fatal) {
-		errno = EUCLEAN; /* A clean restart of the library is required */
+		errno = ECANCELED; /* A clean restart of the library is required */
 		return -1;
 	}
 
@@ -372,7 +372,7 @@ int psched_search(
 
 	/* Check if a fatal error occurred */
 	if (handler->fatal) {
-		errno = EUCLEAN; /* A clean restart of the library is required */
+		errno = ECANCELED; /* A clean restart of the library is required */
 		return -1;
 	}
 
