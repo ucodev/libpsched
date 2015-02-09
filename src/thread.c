@@ -3,9 +3,9 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Threading interface
  *
- * Date: 26-06-2014
+ * Date: 09-02-2015
  * 
- * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
+ * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
  * This file is part of libpsched.
  *
@@ -35,7 +35,15 @@ int thread_init(psched_t *handler) {
 	if (pthread_mutex_init(&handler->event_mutex, NULL))
 		return -1;
 
+	if (pthread_cond_init(&handler->event_cond, NULL))
+		return -1;
+
 	return 0;
+}
+
+void thread_destroy(psched_t *handler) {
+	pthread_mutex_destroy(&handler->event_mutex);
+	pthread_cond_destroy(&handler->event_cond);
 }
 
 void thread_handler(union sigval sv) {

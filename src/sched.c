@@ -3,9 +3,9 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Scheduler interface
  *
- * Date: 27-07-2014
+ * Date: 09-02-2015
  * 
- * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
+ * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
  * This file is part of libpsched.
  *
@@ -55,6 +55,16 @@ static int _cll_compare(const void *d1, const void *d2) {
 
 static void _cll_destroy(void *data) {
 	mm_free(data);
+}
+
+static unsigned int _count_events_in_progress(struct cll_handler *s) {
+	const struct psched_entry *entry = NULL;
+	unsigned int count = 0;
+
+	for (s->rewind(s, 0); (entry = s->iterate(s)); )
+		count += (entry->in_progress == 1);
+
+	return count;
 }
 
 static psched_t *_init(int sig, int threaded) {
@@ -130,30 +140,67 @@ psched_t *psched_sig_init(int sig) {
 	return _init(sig, 0);
 }
 
+int psched_fatal(psched_t *handler) {
+	return handler->fatal;
+}
+
 int psched_destroy(psched_t *handler) {
 	if (!handler->threaded) {
 		if (sigaction(handler->sig, &handler->sa_old, NULL) < 0)
 			return -1;
 	}
 
-	if (timer_delete(handler->timer) < 0)
+	/* Return error only if no fatal state is currently set. Otherwise (on fatal state) continue
+	 * cleaning the psched data.
+	 */
+	if ((timer_delete(handler->timer) < 0) && !handler->fatal)
 		return -1;
 
 	/* Lock event mutex */
 	if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);
 
+	/* Set this handler to be destroyed by event handling function when execution queue is empty */
+	handler->destroy = 1;
+
+	/* Wait for any entries that are in progress to complete, before destroying the
+	 * scheduling queue.
+	 */
+	for (;;) {
+		if (!_count_events_in_progress(handler->s))
+			break;
+
+		if (handler->threaded) pthread_cond_wait(&handler->event_cond, &handler->event_mutex);
+	}
+
+	/* Destroy the scheduling queue */
 	pall_cll_destroy(handler->s);
+
+	/* No entry is or will be armed from this point on ... */
+	handler->armed = NULL;
 
 	/* Unlock event mutex */
 	if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
-
-	/* Set this handler to be destroyed by event handling function when execution queue is empty */
-	handler->destroy = 1;
 
 	return 0;
 }
 
 void psched_handler_destroy(psched_t *handler) {
+	if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);
+
+	/* Wait for any armed entry to be disarmed */
+	for (;;) {
+		if (!handler->armed)
+			break;
+
+		if (handler->threaded) pthread_cond_wait(&handler->event_cond, &handler->event_mutex);
+	}
+
+	if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
+
+	/* Destroy the threading interface */
+	thread_destroy(handler);
+
+	/* Free handler memory */
 	mm_free(handler);
 }
 
@@ -188,6 +235,12 @@ pschedid_t psched_timespec_arm(
 		void *arg)
 {
 	struct psched_entry *entry = NULL;
+
+	/* Check if a fatal error occurred */
+	if (handler->fatal) {
+		errno = EUCLEAN; /* A clean restart of the library is required */
+		return -1;
+	}
 
 	if (!trigger) {
 		errno = EINVAL;
@@ -225,11 +278,15 @@ pschedid_t psched_timespec_arm(
 	if (psched_update_timers(handler) < 0) {
 		handler->s->del(handler->s, entry);
 
-		if (psched_update_timers(handler) < 0)
+		if (psched_update_timers(handler) < 0) {
+			handler->fatal = 1;
 			abort();
+		}
 
 		/* Unlock event mutex */
 		if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
+
+		errno = EUCLEAN;
 
 		return -1;
 	}
@@ -244,6 +301,12 @@ int psched_disarm(psched_t *handler, pschedid_t id) {
 	int ret = 0;
 	struct itimerspec its;
 	struct psched_entry *entry = NULL;
+
+	/* Check if a fatal error occurred */
+	if (handler->fatal) {
+		errno = EUCLEAN; /* A clean restart of the library is required */
+		return -1;
+	}
 
 	memset(&its, 0, sizeof(struct itimerspec));
 
@@ -306,6 +369,12 @@ int psched_search(
 		struct timespec *expire) {
 	struct psched_entry *entry = NULL;
 	int ret = -1;
+
+	/* Check if a fatal error occurred */
+	if (handler->fatal) {
+		errno = EUCLEAN; /* A clean restart of the library is required */
+		return -1;
+	}
 
 	/* Lock event mutex */
 	if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);

@@ -3,9 +3,9 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Signals interface
  *
- * Date: 01-06-2014
+ * Date: 09-02-2015
  * 
- * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
+ * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
  * This file is part of libpsched.
  *
@@ -34,9 +34,5 @@ void sig_handler(int sig, siginfo_t *si, void *context) {
 	psched_t *handler = (psched_t *) si->si_value.sival_ptr;
 
 	event_process(handler);
-
-	/* Check if handler is set to be destroyed */
-	if (!handler->armed && handler->destroy)
-		mm_free(handler);
 }
 
