@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Event Processing interface
  *
- * Date: 09-02-2015
+ * Date: 16-02-2015
  * 
  * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -34,7 +34,7 @@
 
 #include <sys/time.h>
 
-#include "sched.h"
+#include "psched.h"
 #include "timespec.h"
 
 void event_process(psched_t *handler) {

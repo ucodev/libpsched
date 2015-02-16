@@ -1,9 +1,9 @@
 /**
- * @file sched.c
+ * @file psched.c
  * @brief Portable Scheduler Library (libpsched)
  *        Scheduler interface
  *
- * Date: 09-02-2015
+ * Date: 16-02-2015
  * 
  * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -36,7 +36,7 @@
 #include <pall/cll.h>
 
 #include "mm.h"
-#include "sched.h"
+#include "psched.h"
 #include "sig.h"
 #include "thread.h"
 

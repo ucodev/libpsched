@@ -1,9 +1,9 @@
 /**
- * @file sched.h
+ * @file psched.h
  * @brief Portable Scheduler Library (libpsched)
  *        Scheduler interface header
  *
- * Date: 09-02-2015
+ * Date: 16-02-2015
  * 
  * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -25,8 +25,8 @@
  */
 
 
-#ifndef LIBPSCHED_SCHED_H
-#define LIBPSCHED_SCHED_H
+#ifndef LIBPSCHED_PSCHED_H
+#define LIBPSCHED_PSCHED_H
 
 #include <stdint.h>
 #include <signal.h>

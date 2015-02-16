@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Threading interface header
  *
- * Date: 09-02-2015
+ * Date: 16-02-2015
  * 
  * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -31,7 +31,7 @@
 #include <signal.h>
 #include <pthread.h>
 
-#include "sched.h"
+#include "psched.h"
 
 /* Prototypes */
 int thread_init(psched_t *handler);

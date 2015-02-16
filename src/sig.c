@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Signals interface
  *
- * Date: 09-02-2015
+ * Date: 16-02-2015
  * 
  * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -26,7 +26,7 @@
 
 #include <signal.h>
 
-#include "sched.h"
+#include "psched.h"
 #include "event.h"
 #include "mm.h"
 
