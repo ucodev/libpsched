@@ -1,8 +1,8 @@
 CC=`cat ../.compiler`
 INCLUDEDIRS=-I../include
-CCFLAGS=-g -fPIC -fstrict-aliasing -O2 -Wall -Werror
+CCFLAGS=-g -fPIC -fstrict-aliasing -pthread -O2 -Wall -Werror
 ECFLAGS=`cat ../.ecflags`
-LDFLAGS=-shared -g
+LDFLAGS=-shared -g -pthread
 ELFLAGS=`cat ../.elflags`
 ARCHFLAGS=`cat ../.archflags`
 TARGET=libpsched.so
