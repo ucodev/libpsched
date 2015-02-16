@@ -14,7 +14,7 @@ all:
 	${CC} ${INCLUDEDIRS} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c psched.c
 	${CC} ${INCLUDEDIRS} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c thread.c
 	${CC} ${INCLUDEDIRS} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c timespec.c
-	${CC} ${LDFLAGS} -o ${TARGET} event.o mm.o sig.o sched.o thread.o timespec.o ${ELFLAGS}
+	${CC} ${LDFLAGS} -o ${TARGET} event.o mm.o sig.o psched.o thread.o timespec.o ${ELFLAGS}
 
 clean:
 	rm -f *.o

@@ -4,8 +4,8 @@
 #include <time.h>
 #include <unistd.h>
 
-//#include <psched/sched.h>
-#include "sched.h"
+//#include <psched/psched.h>
+#include "psched.h"
 
 void timer_handler(void *arg) {
 	char *str = arg;
