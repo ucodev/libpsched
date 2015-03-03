@@ -4,7 +4,7 @@
 #include <time.h>
 #include <unistd.h>
 
-//#include <psched/psched.h>
+/* #include <psched/psched.h> */
 #include "psched.h"
 
 void timer_handler(void *arg) {
