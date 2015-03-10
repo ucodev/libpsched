@@ -74,11 +74,15 @@ static void *_timer_process(void *arg) {
 		if (timer->t_flags & PSCHED_TIMER_UL_THREAD_INTR_FLAG)
 			break;	/* Thread must exit */
 
-		/* A read operation for the timer was requested. We've updated the timer and we
-		 * should now continue normal processing
+		/* A read operation for the timer was requested. We must now wait for the read
+		 * operation to complete and proceed when we're signaled.
 		 */
-		if (timer->t_flags & PSCHED_TIMER_UL_THREAD_READ_FLAG)
+		if (timer->t_flags & PSCHED_TIMER_UL_THREAD_READ_FLAG) {
+			while (timer->t_flags & PSCHED_TIMER_UL_THREAD_READ_FLAG)
+				pthread_cond_wait(&timer->t_cond, &timer->t_mutex);
+
 			continue;
+		}
 
 		/* A write operation for the timer was requested. We must now wait for the write
 		 * operation to complete and proceed when we're signaled.
@@ -91,6 +95,8 @@ static void *_timer_process(void *arg) {
 		}
 
 		/* TODO: Do notify */
+
+		/* TODO: Add the it_interval to it_value, or break the loop if no interval is set */
 	}
 
 	pthread_mutex_unlock(&timer->t_mutex);
@@ -197,6 +203,10 @@ int timer_settime_ul(
 	int errsv = 0;
 	uintptr_t slot = (uintptr_t) timerid;
 
+	/* TODO: Disarm the timer if new_value is zeroed */
+
+	/* TODO: Cancel the timer if it is armed (killing the thread) and setup (arm) it again */
+
 	/* Acquire timers critical region lock */
 	pthread_mutex_lock(&_mutex_timers);
 
@@ -215,6 +225,9 @@ int timer_settime_ul(
 		goto _settime_failure;
 	}
 
+	/* Mark the timmer as armed */
+	_timers[slot].t_flags |= PSCHED_TIMER_UL_THREAD_ARMED_FLAG;
+
 	/* Release timers critical region lock */
 	pthread_mutex_unlock(&_mutex_timers);
 
@@ -231,13 +244,43 @@ _settime_failure:
 }
 
 int timer_gettime_ul(timer_t timerid, struct itimerspec *curr_value) {
-	errno = ENOSYS;
-	return -1;
+	uintptr_t slot = (uintptr_t) timerid;
+
+	/* Acquire timers critical region lock */
+	pthread_mutex_lock(&_mutex_timers);
+
+	/* This is a read operation */
+	_timers[slot].t_flags |= PSCHED_TIMER_UL_THREAD_READ_FLAG;
+
+	/* Interrupt thread if it's sleeping */
+	pthread_cancel(_timers[slot].t_id);
+
+	/* Acquire the target timer thread mutex, granting that a condition wait occurred */
+	pthread_mutex_lock(&_timers[slot].t_mutex);
+
+	/* Populate the curr_value */
+	memcpy(&curr_value->it_interval, &_timers[slot].arm.it_interval, sizeof(struct timespec));
+	memcpy(&curr_value->it_value, &_timers[slot].rem, sizeof(struct timespec));
+
+	/* We're done with reads */
+	_timers[slot].t_flags &= ~PSCHED_TIMER_UL_THREAD_READ_FLAG;
+
+	/* Set the thread free */
+	pthread_cond_signal(&_timers[slot].t_cond);
+
+	/* Release the target timer thread mutex */
+	pthread_mutex_unlock(&_timers[slot].t_mutex);
+
+	/* Release timers critical region lock */
+	pthread_mutex_unlock(&_mutex_timers);
+
+	return 0;
 }
 
 int timer_getoverrun_ul(timer_t timerid) {
-	errno = ENOSYS;
-	return -1;
+	uintptr_t slot = (uintptr_t) timerid;
+
+	return _timers[slot].overruns;
 }
 
 

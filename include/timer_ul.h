@@ -32,9 +32,10 @@
 #include <pthread.h>
 
 
-#define PSCHED_TIMER_UL_THREAD_INTR_FLAG	0x01	/* Timer must be interrupted */
-#define PSCHED_TIMER_UL_THREAD_READ_FLAG	0x02	/* A read op on timer is required */
-#define PSCHED_TIMER_UL_THREAD_WRITE_FLAG	0x04	/* A write op on timer is required */
+#define PSCHED_TIMER_UL_THREAD_ARMED_FLAG	0x01	/* Timer is armed */
+#define PSCHED_TIMER_UL_THREAD_INTR_FLAG	0x02	/* Timer must be interrupted */
+#define PSCHED_TIMER_UL_THREAD_READ_FLAG	0x04	/* A read op on timer is required */
+#define PSCHED_TIMER_UL_THREAD_WRITE_FLAG	0x08	/* A write op on timer is required */
 
 /* Structures */
 struct timer_ul {
@@ -47,6 +48,8 @@ struct timer_ul {
 
 	struct timespec rem;
 	struct itimerspec arm;
+
+	int overruns;
 
 	/* Thread specific */
 	pthread_t t_id;
