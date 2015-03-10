@@ -32,6 +32,10 @@
 #include <pthread.h>
 
 
+#define PSCHED_TIMER_UL_THREAD_INTR_FLAG	0x01	/* Timer must be interrupted */
+#define PSCHED_TIMER_UL_THREAD_READ_FLAG	0x02	/* A read op on timer is required */
+#define PSCHED_TIMER_UL_THREAD_WRITE_FLAG	0x04	/* A write op on timer is required */
+
 /* Structures */
 struct timer_ul {
 	timer_t id;
@@ -41,11 +45,14 @@ struct timer_ul {
 
 	struct timespec init_time;	/* Absolute time when first armed */
 
+	struct timespec rem;
 	struct itimerspec arm;
 
 	/* Thread specific */
+	pthread_t t_id;
 	pthread_cond_t t_cond;
 	pthread_mutex_t t_mutex;
+	int t_flags;
 };
 
 

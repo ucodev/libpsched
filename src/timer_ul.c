@@ -35,11 +35,71 @@
 
 #include "timer_ul.h"
 #include "mm.h"
+#include "timespec.h"
 
 /* Globals */
 static struct timer_ul *_timers = NULL;
 static size_t _nr_timers = 0;
 static pthread_mutex_t _mutex_timers = PTHREAD_MUTEX_INITIALIZER;
+
+static void *_timer_process(void *arg) {
+	struct timer_ul *timer = arg;
+	struct timespec tcur, tsleep;
+
+	pthread_mutex_init(&timer->t_mutex, NULL);
+	pthread_cond_init(&timer->t_cond, NULL);
+
+	pthread_mutex_lock(&timer->t_mutex);
+
+	for (;;) {
+		/* Process timer based on flags */
+		if (timer->flags & TIMER_ABSTIME) {
+			/* If absolute ... */
+			memcpy(&tsleep, &timer->arm.it_value, sizeof(struct timeval));
+			clock_gettime(timer->clockid, &tcur);
+			timespec_sub(&tsleep, &tcur);
+		} else {
+			/* If relative ... */
+			memcpy(&tsleep, &timer->arm.it_value, sizeof(struct timeval));
+		}
+
+		/* Wait until we're ready to notify */
+		if (nanosleep(&tsleep, &timer->rem) < 0) {
+			/* If interrupted, update the timer value with the remaining time */
+			if ((errno == EINTR) && (timer->flags & TIMER_ABSTIME))
+				memcpy(&timer->arm.it_value, &timer->rem, sizeof(struct timeval));
+		}
+
+		/* Interrupt flag means urgent stop of this thread */
+		if (timer->t_flags & PSCHED_TIMER_UL_THREAD_INTR_FLAG)
+			break;	/* Thread must exit */
+
+		/* A read operation for the timer was requested. We've updated the timer and we
+		 * should now continue normal processing
+		 */
+		if (timer->t_flags & PSCHED_TIMER_UL_THREAD_READ_FLAG)
+			continue;
+
+		/* A write operation for the timer was requested. We must now wait for the write
+		 * operation to complete and proceed when we're signaled.
+		 */
+		if (timer->t_flags & PSCHED_TIMER_UL_THREAD_WRITE_FLAG) {
+			while (timer->t_flags & PSCHED_TIMER_UL_THREAD_WRITE_FLAG)
+				pthread_cond_wait(&timer->t_cond, &timer->t_mutex);
+
+			continue;
+		}
+
+		/* TODO: Do notify */
+	}
+
+	pthread_mutex_unlock(&timer->t_mutex);
+
+	/* All good */
+	pthread_exit(NULL);
+
+	return NULL;
+}
 
 /* API */
 int timer_create_ul(clockid_t clockid, struct sigevent *sevp, timer_t *timerid) {
@@ -134,7 +194,39 @@ int timer_settime_ul(
 	const struct itimerspec *new_value,
 	struct itimerspec *old_value)
 {
-	errno = ENOSYS;
+	int errsv = 0;
+	uintptr_t slot = (uintptr_t) timerid;
+
+	/* Acquire timers critical region lock */
+	pthread_mutex_lock(&_mutex_timers);
+
+	/* Set the init time */
+	if (clock_gettime(_timers[slot].clockid, &_timers[slot].init_time) < 0) {
+		errsv = errno;
+		goto _settime_failure;
+	}
+
+	/* Copy the timer values */
+	memcpy(&_timers[slot].arm, new_value, sizeof(struct itimerspec));
+
+	/* Create a thread to process this timer */
+	if (pthread_create(&_timers[slot].t_id, NULL, &_timer_process, &_timers[slot])) {
+		errsv = errno;
+		goto _settime_failure;
+	}
+
+	/* Release timers critical region lock */
+	pthread_mutex_unlock(&_mutex_timers);
+
+	/* All good */
+	return 0;
+
+_settime_failure:
+	/* Release timers critical region lock */
+	pthread_mutex_unlock(&_mutex_timers);
+
+	errno = errsv;
+
 	return -1;
 }
 

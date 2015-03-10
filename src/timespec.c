@@ -27,6 +27,13 @@
 
 #include <time.h>
 
+void timespec_sub(struct timespec *dest, const struct timespec *src) {
+	long tmp = dest->tv_nsec - src->tv_nsec;
+
+	dest->tv_sec = dest->tv_sec - src->tv_sec - (tmp < 0);
+	dest->tv_nsec = (tmp < 0) ? 1000000000 + tmp : tmp;
+}
+
 void timespec_add(struct timespec *dest, const struct timespec *src) {
 	long tmp = src->tv_nsec + dest->tv_nsec;
 

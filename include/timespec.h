@@ -31,6 +31,7 @@
 #include <time.h>
 
 /* Prototypes */
+void timespec_sub(struct timespec *dest, const struct timespec *src);
 void timespec_add(struct timespec *dest, const struct timespec *src);
 int timespec_cmp(const struct timespec *ts1, const struct timespec *ts2);
 
