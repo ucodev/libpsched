@@ -56,7 +56,13 @@ static void *_timer_process(void *arg) {
 		if (timer->flags & TIMER_ABSTIME) {
 			/* If absolute ... */
 			memcpy(&tsleep, &timer->arm.it_value, sizeof(struct timeval));
-			clock_gettime(timer->clockid, &tcur);
+
+			/* If we can't retrieve current time, there's no point in continuing */
+			/* TODO: use some alternatives to clock_gettime() if it fails. */
+			if (clock_gettime(timer->clockid, &tcur) < 0)
+				abort();
+
+			/* Subtract the current time to the absolute value of the timer */
 			timespec_sub(&tsleep, &tcur);
 		} else {
 			/* If relative ... */
@@ -117,6 +123,9 @@ static void *_timer_process(void *arg) {
 		}
 
 		/* Add the it_interval to it_value, or break the loop if no interval is set */
+		if (!timer->arm.it_interval.tv_sec && !timer->arm.it_interval.tv_nsec)
+			break;
+
 		timespec_add(&timer->arm.it_value, &timer->arm.it_interval);
 	}
 
@@ -156,7 +165,7 @@ int timer_create_ul(clockid_t clockid, struct sigevent *sevp, timer_t *timerid) 
 	/* Check if we've found a free control slot */
 	if (slot == -1) {
 		/* No free slots... allocate a new one */
-		if (!(_timers = mm_realloc(_timers, _nr_timers + 1))) {
+		if (!(_timers = mm_realloc(_timers, sizeof(struct timer_ul) * (_nr_timers + 1)))) {
 			pthread_mutex_unlock(&_mutex_timers);
 
 			/* Everything will be screwed from now on... */
@@ -233,6 +242,7 @@ _create_failure:
 }
 
 int timer_delete_ul(timer_t timerid) {
+	int i = 0, used = 0;
 	uintptr_t slot = ((uintptr_t) timerid) - 1;
 	struct itimerspec disarm = { { 0, 0 }, { 0, 0 } };
 
@@ -249,6 +259,32 @@ int timer_delete_ul(timer_t timerid) {
 	/* Cleanup timer data */
 	memset(&_timers[slot], 0, sizeof(struct timer_ul));
 
+	/* Entering critical region */
+	pthread_mutex_lock(&_mutex_timers);
+
+	/* Check if the list is still being used, and peform some cleanup */
+	for (i = 0; i < _nr_timers; i ++) {
+		if (_timers[i].t_flags & PSCHED_TIMER_UL_THREAD_WAIT_FLAG) {
+			pthread_join(_timers[i].t_id, NULL);
+			_timers[i].id = 0;
+		}
+
+		if (_timers[i].id) {
+			used = 1;
+			break;
+		}
+	}
+
+	/* If unused, free all the resources */
+	if (!used) {
+		_nr_timers = 0;
+		mm_free(_timers);
+		_timers = NULL;
+	}
+
+	/* Leaving critical region */
+	pthread_mutex_unlock(&_mutex_timers);
+
 	/* All good */
 	return 0;
 }
@@ -264,6 +300,11 @@ int timer_settime_ul(
 
 	/* Sanity check */
 	if (slot >= _nr_timers) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!new_value) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -321,6 +362,9 @@ int timer_settime_ul(
 		goto _settime_failure;
 	}
 
+	/* Set flags */
+	_timers[slot].flags = flags;
+
 	/* Copy the timer values */
 	memcpy(&_timers[slot].arm, new_value, sizeof(struct itimerspec));
 
@@ -353,6 +397,11 @@ int timer_gettime_ul(timer_t timerid, struct itimerspec *curr_value) {
 
 	/* Sanity check */
 	if (slot >= _nr_timers) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!curr_value) {
 		errno = EINVAL;
 		return -1;
 	}
