@@ -11,7 +11,7 @@ rm -f .ecflags
 rm -f .elflags
 
 if [ `uname` = "OpenBSD" ]; then
-	printf -- "-DCONFIG_NO_SIGEVENT=1 -DCONFIG_USE_TIMER_UL=1 " > .ecflags
+	printf -- "-DPSCHED_INTERNAL_SIGEVENT=1 -DPSCHED_INTERNAL_TIMER_UL=1 " > .ecflags
 else
 	printf -- "-lrt " > .elflags
 fi

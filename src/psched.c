@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Scheduler interface
  *
- * Date: 16-02-2015
+ * Date: 11-03-2015
  * 
  * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -39,6 +39,7 @@
 #include "psched.h"
 #include "sig.h"
 #include "thread.h"
+#include "timer_ul.h"
 
 /* Statics */
 static int _cll_compare(const void *d1, const void *d2) {

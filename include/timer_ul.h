@@ -31,18 +31,18 @@
 #include <time.h>
 #include <pthread.h>
 
-#ifdef CONFIG_NO_TIMER_T
+#ifdef PSCHED_INTERNAL_TIMER_T
 typedef void * timer_t;
 #endif
 
-#ifdef CONFIG_NO_SIGVAL
+#ifdef PSCHED_INTERNAL_SIGVAL
 union sigval {
 	int sival_int;
 	void *sival_ptr;
 };
 #endif
 
-#ifdef CONFIG_NO_SIGEVENT
+#ifdef PSCHED_INTERNAL_SIGEVENT
 struct sigevent {
 	int sigev_notify;
 	int sigev_signo;
@@ -58,7 +58,7 @@ struct sigevent {
 #define SIGEV_THREAD	0x04
 #endif
 
-#ifdef CONFIG_USE_TIMER_UL
+#ifdef PSCHED_INTERNAL_TIMER_UL
 #define timer_create		timer_create_ul
 #define timer_delete		timer_delete_ul
 #define timer_settime		timer_settime_ul

@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Scheduler interface header
  *
- * Date: 16-02-2015
+ * Date: 11-03-2015
  * 
  * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -36,6 +36,8 @@
 #include <pall/cll.h>
 
 #include "mm.h"
+#include "timer_ul.h"
+
 
 typedef uintptr_t pschedid_t;
 
