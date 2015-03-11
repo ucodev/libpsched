@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        A userland implementation of the timer_*() calls
  *
- * Date: 10-03-2015
+ * Date: 11-03-2015
  * 
  * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -120,6 +120,8 @@ static void *_timer_process(void *arg) {
 		timespec_add(&timer->arm.it_value, &timer->arm.it_interval);
 	}
 
+	timer->t_flags |= PSCHED_TIMER_UL_THREAD_WAIT_FLAG;
+
 	pthread_mutex_unlock(&timer->t_mutex);
 
 	/* All good */
@@ -138,6 +140,14 @@ int timer_create_ul(clockid_t clockid, struct sigevent *sevp, timer_t *timerid) 
 	/* Check if there's a free control slot */
 	for (i = 0; _timers && (i < _nr_timers); i ++) {
 		if (!_timers[i].id) {
+			/* Assign the slot */
+			slot = i;
+			break;
+		} else if (_timers[i].t_flags & PSCHED_TIMER_UL_THREAD_WAIT_FLAG) {
+			/* Thread is waiting to be joined */
+			pthread_join(_timers[i].t_id, NULL);
+
+			/* Assign the slot */
 			slot = i;
 			break;
 		}
@@ -283,6 +293,9 @@ int timer_settime_ul(
 
 		/* Release the target timer thread mutex */
 		pthread_mutex_unlock(&_timers[slot].t_mutex);
+
+		/* Wait for thread termination */
+		pthread_join(_timers[slot].t_id, NULL);
 
 		/* Cleanup timer entry slot */
 		memset(&_timers[slot].init_time, 0, sizeof(struct timespec));

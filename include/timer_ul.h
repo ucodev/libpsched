@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Header file for the userland implementation of the timer_*() calls
  *
- * Date: 10-03-2015
+ * Date: 11-03-2015
  * 
  * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -36,6 +36,7 @@
 #define PSCHED_TIMER_UL_THREAD_INTR_FLAG	0x02	/* Timer must be interrupted */
 #define PSCHED_TIMER_UL_THREAD_READ_FLAG	0x04	/* A read op on timer is required */
 #define PSCHED_TIMER_UL_THREAD_WRITE_FLAG	0x08	/* A write op on timer is required */
+#define PSCHED_TIMER_UL_THREAD_WAIT_FLAG	0x10	/* Thread exited and waiting to join */
 
 /* Structures */
 struct timer_ul {
