@@ -268,7 +268,7 @@ int timer_delete_ul(timer_t timerid) {
 	for (i = 0; i < _nr_timers; i ++) {
 		if (_timers[i].t_flags & PSCHED_TIMER_UL_THREAD_WAIT_FLAG) {
 			pthread_join(_timers[i].t_id, NULL);
-			_timers[i].id = 0;
+			memset(&_timers[i], 0, sizeof(struct timer_ul));
 		}
 
 		if (_timers[i].id) {
