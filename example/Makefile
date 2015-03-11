@@ -1,7 +1,7 @@
 CC=`cat ../.compiler`
 INCLUDEDIRS=-I../include
 CCFLAGS=-pedantic -fstrict-aliasing -Wall -Werror -pthread -g
-LDFLAGS=../src/libpsched.so -pthread -lpall -lrt -s
+LDFLAGS=../src/libpsched.so -pthread -lpall -s
 ELFLAGS=`cat ../.elflags`
 ARCHFLAGS=`cat ../.archflags`
 

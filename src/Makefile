@@ -1,6 +1,5 @@
 CC=`cat ../.compiler`
 INCLUDEDIRS=-I../include
-DEFINES=`cat ../.defines`
 CCFLAGS=-g -fPIC -fstrict-aliasing -pthread -O2 -Wall -Werror
 ECFLAGS=`cat ../.ecflags`
 LDFLAGS=-shared -g
@@ -9,13 +8,13 @@ ARCHFLAGS=`cat ../.archflags`
 TARGET=libpsched.so
 
 all:
-	${CC} ${INCLUDEDIRS} ${DEFINES} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c event.c
-	${CC} ${INCLUDEDIRS} ${DEFINES} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c mm.c
-	${CC} ${INCLUDEDIRS} ${DEFINES} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c sig.c
-	${CC} ${INCLUDEDIRS} ${DEFINES} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c psched.c
-	${CC} ${INCLUDEDIRS} ${DEFINES} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c thread.c
-	${CC} ${INCLUDEDIRS} ${DEFINES} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c timer_ul.c
-	${CC} ${INCLUDEDIRS} ${DEFINES} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c timespec.c
+	${CC} ${INCLUDEDIRS} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c event.c
+	${CC} ${INCLUDEDIRS} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c mm.c
+	${CC} ${INCLUDEDIRS} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c sig.c
+	${CC} ${INCLUDEDIRS} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c psched.c
+	${CC} ${INCLUDEDIRS} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c thread.c
+	${CC} ${INCLUDEDIRS} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c timer_ul.c
+	${CC} ${INCLUDEDIRS} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c timespec.c
 	${CC} ${LDFLAGS} -o ${TARGET} event.o mm.o sig.o psched.o thread.o timer_ul.o timespec.o ${ELFLAGS}
 
 clean:

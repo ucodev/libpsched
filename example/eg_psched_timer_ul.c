@@ -8,7 +8,7 @@
 #include "timer_ul.h"
 
 void event(union sigval arg) {
-	printf("Event triggered at: %lu\n", time(NULL));
+	printf("Event triggered at: %lu\n", (unsigned long) time(NULL));
 }
 
 int main(void) {
@@ -36,7 +36,7 @@ int main(void) {
 		return 1;
 	}
 
-	printf("Waiting for event (%lu)...\n", time(NULL));
+	printf("Waiting for event (Current time: %lu; Expected trigger at: %lu)...\n", (unsigned long) (trigger.it_value.tv_sec - 5), (unsigned long) trigger.it_value.tv_sec);
 
 	usleep(6000000);
 

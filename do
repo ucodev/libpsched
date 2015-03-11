@@ -7,15 +7,20 @@
 . ./lib/sh/arch.inc
 
 ## Target options ##
+rm -f .ecflags
+rm -f .elflags
+
 if [ `uname` = "OpenBSD" ]; then
-	echo "-DCONFIG_NO_SIGEVENT=1 -DCONFIG_USE_TIMER_UL=1" > .defines
+	printf -- "-DCONFIG_NO_SIGEVENT=1 -DCONFIG_USE_TIMER_UL=1 " > .ecflags
+else
+	printf -- "-lrt " > .elflags
 fi
 
 ## Options ##
 if [ $# -eq 1 ]; then
 	if [ "${1}" == "fsma" ]; then
-		echo "-DUSE_LIBFSMA" > .ecflags
-		echo "-lfsma" > .elflags
+		printf -- "-DUSE_LIBFSMA " >> .ecflags
+		printf -- "-lfsma " >> .elflags
 	fi
 else
 	touch .ecflags

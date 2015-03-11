@@ -35,12 +35,14 @@
 typedef void * timer_t;
 #endif
 
-#ifdef CONFIG_NO_SIGEVENT
+#ifdef CONFIG_NO_SIGVAL
 union sigval {
 	int sival_int;
 	void *sival_ptr;
 };
+#endif
 
+#ifdef CONFIG_NO_SIGEVENT
 struct sigevent {
 	int sigev_notify;
 	int sigev_signo;
