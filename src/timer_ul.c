@@ -71,8 +71,13 @@ static void *_timer_process(void *arg) {
 		}
 
 		/* Interrupt flag means urgent stop of this thread */
-		if (timer->t_flags & PSCHED_TIMER_UL_THREAD_INTR_FLAG)
-			break;	/* Thread must exit */
+		if (timer->t_flags & PSCHED_TIMER_UL_THREAD_INTR_FLAG) {
+			while (timer->t_flags & PSCHED_TIMER_UL_THREAD_INTR_FLAG)
+				pthread_cond_wait(&timer->t_cond, &timer->t_mutex);
+
+			/* Let this thread die */
+			break;
+		}
 
 		/* A read operation for the timer was requested. We must now wait for the read
 		 * operation to complete and proceed when we're signaled.
@@ -94,9 +99,25 @@ static void *_timer_process(void *arg) {
 			continue;
 		}
 
-		/* TODO: Do notify */
+		/* Invoke notification */
+		switch (timer->sevp.sigev_notify) {
+			case SIGEV_THREAD: {
+				timer->sevp.sigev_notify_function(timer->sevp.sigev_value);
+			} break;
+			case SIGEV_SIGNAL: {
+				/* TODO: Not yet implemented */
+				abort();
+			} break;
+			case SIGEV_NONE: {
+			} break;
+			default: {
+				/* Something went wrong... we don't recognize this state */
+				abort();
+			}
+		}
 
-		/* TODO: Add the it_interval to it_value, or break the loop if no interval is set */
+		/* Add the it_interval to it_value, or break the loop if no interval is set */
+		timespec_add(&timer->arm.it_value, &timer->arm.it_interval);
 	}
 
 	pthread_mutex_unlock(&timer->t_mutex);
@@ -167,6 +188,18 @@ int timer_create_ul(clockid_t clockid, struct sigevent *sevp, timer_t *timerid) 
 		goto _create_failure;
 	}
 
+	switch (sevp->sigev_notify) {
+		case SIGEV_THREAD: {
+		} break;
+		case SIGEV_NONE: {
+		} break;
+		case SIGEV_SIGNAL:
+		default: {
+			errsv = EINVAL;
+			goto _create_failure;
+		}
+	}
+
 	/* Store sigevent data */
 	memcpy(&_timers[slot].sevp, sevp, sizeof(struct sigevent));
 
@@ -190,8 +223,24 @@ _create_failure:
 }
 
 int timer_delete_ul(timer_t timerid) {
-	errno = ENOSYS;
-	return -1;
+	uintptr_t slot = ((uintptr_t) timerid) - 1;
+	struct itimerspec disarm = { { 0, 0 }, { 0, 0 } };
+
+	/* Sanity check */
+	if (slot >= _nr_timers) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	/* Disarm timer, if armed */
+	if (timer_settime_ul(timerid, 0, &disarm, NULL) < 0)
+		return -1;
+
+	/* Cleanup timer data */
+	memset(&_timers[slot], 0, sizeof(struct timer_ul));
+
+	/* All good */
+	return 0;
 }
 
 int timer_settime_ul(
@@ -201,14 +250,57 @@ int timer_settime_ul(
 	struct itimerspec *old_value)
 {
 	int errsv = 0;
-	uintptr_t slot = (uintptr_t) timerid;
+	uintptr_t slot = ((uintptr_t) timerid) - 1;
 
-	/* TODO: Disarm the timer if new_value is zeroed */
-
-	/* TODO: Cancel the timer if it is armed (killing the thread) and setup (arm) it again */
+	/* Sanity check */
+	if (slot >= _nr_timers) {
+		errno = EINVAL;
+		return -1;
+	}
 
 	/* Acquire timers critical region lock */
 	pthread_mutex_lock(&_mutex_timers);
+
+	/* Check if this timer is to be disarmed or changed */
+	if (_timers[slot].t_flags & PSCHED_TIMER_UL_THREAD_ARMED_FLAG) {
+		/* Cancel the current timer */
+		_timers[slot].t_flags |= PSCHED_TIMER_UL_THREAD_INTR_FLAG;
+
+		pthread_cancel(_timers[slot].t_id);
+
+		/* Acquire the target timer thread mutex, granting that a condition wait occurred */
+		pthread_mutex_lock(&_timers[slot].t_mutex);
+
+		/* Copy last known value and interval */
+		if (old_value)
+			memcpy(old_value, &_timers[slot].arm, sizeof(struct itimerspec));
+
+		/* We're done with reads */
+		_timers[slot].t_flags &= ~PSCHED_TIMER_UL_THREAD_INTR_FLAG;
+
+		/* Set the thread free */
+		pthread_cond_signal(&_timers[slot].t_cond);
+
+		/* Release the target timer thread mutex */
+		pthread_mutex_unlock(&_timers[slot].t_mutex);
+
+		/* Cleanup timer entry slot */
+		memset(&_timers[slot].init_time, 0, sizeof(struct timespec));
+		memset(&_timers[slot].rem, 0, sizeof(struct timespec));
+		memset(&_timers[slot].arm, 0, sizeof(struct timespec));
+		_timers[slot].overruns = 0;
+		memset(&_timers[slot].t_id, 0, sizeof(pthread_t));
+		memset(&_timers[slot].t_cond, 0, sizeof(pthread_cond_t));
+		memset(&_timers[slot].t_mutex, 0, sizeof(pthread_mutex_t));
+		_timers[slot].t_flags = 0;
+	}
+
+	/* If it this is a disarm operation ... */
+	if (!new_value->it_value.tv_sec && !new_value->it_value.tv_nsec && !new_value->it_interval.tv_sec && !new_value->it_interval.tv_nsec) {
+		pthread_mutex_unlock(&_mutex_timers);
+
+		return 0;
+	}
 
 	/* Set the init time */
 	if (clock_gettime(_timers[slot].clockid, &_timers[slot].init_time) < 0) {
@@ -244,7 +336,13 @@ _settime_failure:
 }
 
 int timer_gettime_ul(timer_t timerid, struct itimerspec *curr_value) {
-	uintptr_t slot = (uintptr_t) timerid;
+	uintptr_t slot = ((uintptr_t) timerid) - 1;
+
+	/* Sanity check */
+	if (slot >= _nr_timers) {
+		errno = EINVAL;
+		return -1;
+	}
 
 	/* Acquire timers critical region lock */
 	pthread_mutex_lock(&_mutex_timers);
@@ -278,7 +376,13 @@ int timer_gettime_ul(timer_t timerid, struct itimerspec *curr_value) {
 }
 
 int timer_getoverrun_ul(timer_t timerid) {
-	uintptr_t slot = (uintptr_t) timerid;
+	uintptr_t slot = ((uintptr_t) timerid) - 1;
+
+	/* Sanity check */
+	if (slot >= _nr_timers) {
+		errno = EINVAL;
+		return -1;
+	}
 
 	return _timers[slot].overruns;
 }
