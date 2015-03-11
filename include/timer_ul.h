@@ -50,6 +50,10 @@ struct sigevent {
 
 	void *sigev_notify_attributes;
 };
+
+#define	SIGEV_NONE	0x01
+#define SIGEV_SIGNAL	0x02
+#define SIGEV_THREAD	0x04
 #endif
 
 #ifdef CONFIG_USE_TIMER_UL
