@@ -122,6 +122,8 @@ static void *_timer_process(void *arg) {
 			}
 		}
 
+		/* TODO: Check if overrun occurred. */
+
 		/* Add the it_interval to it_value, or break the loop if no interval is set */
 		if (!timer->arm.it_interval.tv_sec && !timer->arm.it_interval.tv_nsec)
 			break;
