@@ -6,6 +6,11 @@
 ## Detect architecture ##
 . ./lib/sh/arch.inc
 
+## Target options ##
+if [ `uname` = "OpenBSD" ]; then
+	echo "-DCONFIG_NO_SIGEVENT=1 -DCONFIG_USE_TIMER_UL=1" > .defines
+fi
+
 ## Options ##
 if [ $# -eq 1 ]; then
 	if [ "${1}" == "fsma" ]; then

@@ -31,7 +31,36 @@
 #include <time.h>
 #include <pthread.h>
 
+#ifdef CONFIG_NO_TIMER_T
+typedef void * timer_t;
+#endif
 
+#ifdef CONFIG_NO_SIGEVENT
+union sigval {
+	int sival_int;
+	void *sival_ptr;
+};
+
+struct sigevent {
+	int sigev_notify;
+	int sigev_signo;
+	union sigval sigev_value;
+
+	void (*sigev_notify_function) (union sigval);
+
+	void *sigev_notify_attributes;
+};
+#endif
+
+#ifdef CONFIG_USE_TIMER_UL
+#define timer_create		timer_create_ul
+#define timer_delete		timer_delete_ul
+#define timer_settime		timer_settime_ul
+#define timer_gettime		timer_gettime_ul
+#define timer_getoverrun	timer_getoverrun_ul
+#endif
+
+/* Flags for userland timer_*() implementation */
 #define PSCHED_TIMER_UL_THREAD_ARMED_FLAG	0x01	/* Timer is armed */
 #define PSCHED_TIMER_UL_THREAD_INTR_FLAG	0x02	/* Timer must be interrupted */
 #define PSCHED_TIMER_UL_THREAD_READ_FLAG	0x04	/* A read op on timer is required */
