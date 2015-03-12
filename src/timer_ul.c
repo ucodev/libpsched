@@ -340,6 +340,10 @@ int timer_settime_ul(
 		/* Wait for thread termination */
 		pthread_join(_timers[slot].t_id, NULL);
 
+		/* Destroy mutexes */
+		pthread_cond_destroy(&_timers[slot].t_cond);
+		pthread_mutex_destroy(&_timers[slot].t_mutex);
+
 		/* Cleanup timer entry slot */
 		memset(&_timers[slot].init_time, 0, sizeof(struct timespec));
 		memset(&_timers[slot].rem, 0, sizeof(struct timespec));
