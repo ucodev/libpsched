@@ -12,6 +12,8 @@ rm -f .elflags
 
 if [ `uname` = "OpenBSD" ]; then
 	printf -- "-DPSCHED_INTERNAL_SIGEVENT=1 -DPSCHED_INTERNAL_TIMER_UL=1 " > .ecflags
+elif [ `uname` = "Minix" ]; then
+	printf -- "-DPSCHED_NO_SIG=1 -DPSCHED_INTERNAL_TIMER_UL=1 " > .ecflags
 else
 	printf -- "-lrt " > .elflags
 fi

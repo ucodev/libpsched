@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Scheduler interface
  *
- * Date: 11-03-2015
+ * Date: 13-03-2015
  * 
  * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -102,10 +102,13 @@ static psched_t *_init(int sig, int threaded) {
 	if (threaded) {
 		sevp.sigev_notify = SIGEV_THREAD;
 		sevp.sigev_notify_function = &thread_handler;
-	} else {
+	}
+#ifndef PSCHED_NO_SIG
+	 else {
 		sevp.sigev_notify = SIGEV_SIGNAL;
 		sevp.sigev_signo = sig;
 	}
+#endif
 
 	if (timer_create(CLOCK_REALTIME, &sevp, &handler->timer) < 0) {
 		pall_cll_destroy(handler->s);
@@ -114,6 +117,7 @@ static psched_t *_init(int sig, int threaded) {
 		return NULL;
 	}
 
+#ifndef PSCHED_NO_SIG
 	if (!threaded) {
 		handler->sig = sig;
 		handler->sa.sa_flags = SA_SIGINFO;
@@ -128,6 +132,7 @@ static psched_t *_init(int sig, int threaded) {
 			return NULL;
 		}
 	}
+#endif
 
 	return handler;
 }
@@ -138,7 +143,12 @@ psched_t *psched_thread_init(void) {
 }
 
 psched_t *psched_sig_init(int sig) {
+#ifdef PSCHED_NO_SIG
+	errno = ENOSYS;
+	return -1;
+#else
 	return _init(sig, 0);
+#endif
 }
 
 int psched_fatal(psched_t *handler) {
