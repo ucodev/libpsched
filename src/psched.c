@@ -145,7 +145,7 @@ psched_t *psched_thread_init(void) {
 psched_t *psched_sig_init(int sig) {
 #ifdef PSCHED_NO_SIG
 	errno = ENOSYS;
-	return -1;
+	return NULL;
 #else
 	return _init(sig, 0);
 #endif
