@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        A userland implementation of the timer_*() calls
  *
- * Date: 11-03-2015
+ * Date: 13-03-2015
  * 
  * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -190,10 +190,12 @@ int timer_create_ul(clockid_t clockid, struct sigevent *sevp, timer_t *timerid) 
 		} break;
 		case CLOCK_MONOTONIC: {
 		} break;
+#ifndef PSCHED_TIMER_UL_NO_CPUTIME
 		case CLOCK_PROCESS_CPUTIME_ID: {
 		} break;
 		case CLOCK_THREAD_CPUTIME_ID: {
 		} break;
+#endif
 		default: {
 			errsv = EINVAL;
 			goto _create_failure;
