@@ -13,9 +13,10 @@ rm -f .elflags
 if [ `uname` = "OpenBSD" ]; then
 	printf -- "-DPSCHED_INTERNAL_SIGEVENT=1 -DPSCHED_INTERNAL_TIMER_UL=1 " > .ecflags
 elif [ `uname` = "Minix" ]; then
-	printf -- "-DPSCHED_NO_SIG=1 -DPSCHED_INTERNAL_TIMER_UL=1 -DPSCHED_TIMER_UL_NO_CPUTIME=1 " > .ecflags
+	printf -- "-I/usr/pkg/include/ -DPSCHED_NO_SIG=1 -DPSCHED_INTERNAL_TIMER_UL=1 -DPSCHED_TIMER_UL_NO_CPUTIME=1 " > .ecflags
+	printf -- "/usr/pkg/lib/libpthread.so " > .elflags
 else
-	printf -- "-lrt " > .elflags
+	printf -- "-pthread -lrt " > .elflags
 fi
 
 ## Options ##
