@@ -1,11 +1,11 @@
 CC=`cat ../.compiler`
 INCLUDEDIRS=-I../include
-CCFLAGS=-g -fPIC -fstrict-aliasing -pthread -O2 -Wall -Werror
+CCFLAGS=
 ECFLAGS=`cat ../.ecflags`
-LDFLAGS=-shared -g
+LDFLAGS=-shared
 ELFLAGS=`cat ../.elflags`
 ARCHFLAGS=`cat ../.archflags`
-TARGET=libpsched.so
+TARGET=libpsched.`cat ../.extlib`
 
 all:
 	${CC} ${INCLUDEDIRS} ${CCFLAGS} ${ECFLAGS} ${ARCHFLAGS} -c event.c

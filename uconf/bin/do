@@ -1,0 +1,49 @@
+#!/bin/sh
+
+## Detect compiler ##
+. ./uconf/lib/sh/compiler.inc
+
+## Detect linker ##
+. ./uconf/lib/sh/linker.inc
+
+## Detect architecture ##
+. ./uconf/lib/sh/arch.inc
+
+## OS-Specific options ##
+. ./uconf/lib/sh/os-spec.inc
+
+## Addon options ##
+. ./uconf/lib/sh/addons.inc
+
+## Test optional libraries ##
+. ./uconf/lib/sh/opt-libs.inc
+
+## Build ##
+if [ -e ./uconf/params/default/do ]; then
+	while read cmd; do
+		/bin/sh -c "${cmd}"
+
+		if [ $? -ne 0 ]; then
+			echo "Failed to execute: ${cmd}"
+			exit 1
+		fi
+	done < ./uconf/params/default/do
+fi
+
+if [ -e ./uconf/params/`cat .osname 2> /dev/null`/do ]; then
+	while read cmd; do
+		/bin/sh -c "${cmd}"
+
+		if [ $? -ne 0 ]; then
+			echo "Failed to execute: ${cmd}"
+			exit 1
+		fi
+	done < ./uconf/params/`cat .osname`/do
+fi
+
+touch .done
+
+echo "Build completed."
+
+exit 0
+

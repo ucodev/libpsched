@@ -1,0 +1,1 @@
+-g -fPIC -fstrict-aliasing -O2 -Wall -Werror
