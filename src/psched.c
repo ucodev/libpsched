@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Scheduler interface
  *
- * Date: 13-03-2015
+ * Date: 17-03-2015
  * 
  * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -161,17 +161,17 @@ int psched_destroy(psched_t *handler) {
 			return -1;
 	}
 
-	/* Return error only if no fatal state is currently set. Otherwise (on fatal state) continue
-	 * cleaning the psched data.
-	 */
-	if ((timer_delete(handler->timer) < 0) && !handler->fatal)
-		return -1;
-
 	/* Lock event mutex */
 	if (handler->threaded) pthread_mutex_lock(&handler->event_mutex);
 
 	/* Set this handler to be destroyed by event handling function when execution queue is empty */
 	handler->destroy = 1;
+
+	/* Return error only if no fatal state is currently set. Otherwise (on fatal state) continue
+	 * cleaning the psched data.
+	 */
+	if ((timer_delete(handler->timer) < 0) && !handler->fatal)
+		return -1;
 
 	/* Wait for any entries that are in progress to complete, before destroying the
 	 * scheduling queue.
@@ -414,6 +414,11 @@ int psched_update_timers(psched_t *handler) {
 
 	memset(&its, 0, sizeof(struct itimerspec));
 
+	/* Check if the handler is being destroyed */
+	if (handler->destroy)
+		return 0;
+
+	/* Check if there's an armed entry */
 	if (handler->armed) {
 		/* Disarm timer */
 		if (timer_settime(handler->timer, TIMER_ABSTIME, &its, NULL) < 0)
@@ -446,6 +451,7 @@ int psched_update_timers(psched_t *handler) {
 	if (timer_settime(handler->timer, TIMER_ABSTIME, &its, NULL) < 0)
 		return -1;
 
+	/* All good */
 	return 0;
 }
 
