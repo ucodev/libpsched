@@ -17,7 +17,7 @@ all:
 install_all:
 	mkdir -p ${SYSLIBDIR}
 	mkdir -p ${SYSINCLUDEDIR}/psched
-	cp src/libpsched.`cat .extlib` ${SYSLIBDIR}/
+	cp src/libpsched.* ${SYSLIBDIR}/
 	cp include/*.h ${SYSINCLUDEDIR}/psched/
 
 clean:
