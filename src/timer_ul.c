@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        A userland implementation of the timer_*() calls
  *
- * Date: 13-03-2015
+ * Date: 28-03-2015
  * 
  * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -34,6 +34,10 @@
 #include <pthread.h>
 
 #include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/select.h>
 
 #include "timer_ul.h"
 #include "mm.h"
@@ -44,38 +48,104 @@ static struct timer_ul *_timers = NULL;
 static size_t _nr_timers = 0;
 static pthread_mutex_t _mutex_timers = PTHREAD_MUTEX_INITIALIZER;
 
+int _fd_set_nonblock(int fd) {
+#ifdef COMPILE_WIN32
+	return 0;
+#else
+	int flags = 0;
+
+	if ((flags = fcntl(fd, F_GETFL)) < 0)
+		return -1;
+
+	if (!(flags & O_NONBLOCK)) {
+		if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
+			return -1;
+	}
+
+	return 0;
+#endif
+}
+
 static void *_timer_process(void *arg) {
 	struct timer_ul *timer = arg;
-	struct timespec tcur, tsleep;
+	struct timespec tcur, tsleep, tv_start, tv_stop, tv_delta;
+	struct timeval wait_val;
 
 	pthread_mutex_init(&timer->t_mutex, NULL);
 	pthread_cond_init(&timer->t_cond, NULL);
 
+	/* Create the pipe */
+	if (pipe(timer->wait_pipe) < 0)
+		abort(); /* Out of options */
+
+	/* Set the read end of the pipe as non-block */
+	_fd_set_nonblock(timer->wait_pipe[0]);
+
+	/* Acquire the lock */
 	pthread_mutex_lock(&timer->t_mutex);
 
+	/* It's imperative that timer->rem be set to zero before the first iteration of the loop */
+	memset(&timer->rem, 0, sizeof(struct timespec));
+
 	for (;;) {
-		/* Process timer based on flags */
-		if (timer->flags & TIMER_ABSTIME) {
-			/* If absolute ... */
-			memcpy(&tsleep, &timer->arm.it_value, sizeof(struct timeval));
+		if ((timer->rem.tv_sec <= 0) && (timer->rem.tv_nsec <= 0)) {
+			memset(&timer->rem, 0, sizeof(struct timespec));
 
-			/* If we can't retrieve current time, there's no point in continuing */
-			/* TODO: use some alternatives to clock_gettime() if it fails. */
-			if (clock_gettime(timer->clockid, &tcur) < 0)
-				abort();
+			/* Process timer based on flags */
+			if (timer->flags & TIMER_ABSTIME) {
+				/* If absolute ... */
+				memcpy(&tsleep, &timer->arm.it_value, sizeof(struct timespec));
 
-			/* Subtract the current time to the absolute value of the timer */
-			timespec_sub(&tsleep, &tcur);
+				/* If we can't retrieve current time, there's no point in
+				 * continuing
+				 */
+				/* TODO: use some alternatives to clock_gettime() if it fails. */
+				if (clock_gettime(timer->clockid, &tcur) < 0)
+					abort();
+
+				/* Subtract the current time to the absolute value of the timer */
+				timespec_sub(&tsleep, &tcur);
+			} else {
+				/* If relative ... */
+				memcpy(&tsleep, &timer->arm.it_value, sizeof(struct timespec));
+			}
 		} else {
-			/* If relative ... */
-			memcpy(&tsleep, &timer->arm.it_value, sizeof(struct timeval));
+			/* If there's time left to wait ... */
+			memcpy(&tsleep, &timer->rem, sizeof(struct timespec));
 		}
 
-		/* Wait until we're ready to notify */
-		if (nanosleep(&tsleep, &timer->rem) < 0) {
-			/* If interrupted, update the timer value with the remaining time */
-			if ((errno == EINTR) && (timer->flags & TIMER_ABSTIME))
-				memcpy(&timer->arm.it_value, &timer->rem, sizeof(struct timeval));
+		/* Prepare parameters for select() */
+		FD_ZERO(&timer->wait_set);
+		FD_SET(timer->wait_pipe[0], &timer->wait_set);
+
+		wait_val.tv_sec = tsleep.tv_sec;
+		wait_val.tv_usec = tsleep.tv_nsec / 1000;
+
+		/* Snapshot the current time state */
+		memcpy(&timer->rem, &tsleep, sizeof(struct timespec));
+		clock_gettime(CLOCK_REALTIME, &tv_start); /* TODO: Alternatives? */
+
+		/* Wait for timeout or some event on the pipe */
+		if (select(timer->wait_pipe[0] + 1, &timer->wait_set, NULL, NULL, &wait_val) < 0) {
+			/* 'wait_set' is unreliable from now on ... */
+			;
+		}
+
+		/* If something was written on the pipe, an interrupt ocurred */
+		if (FD_ISSET(timer->wait_pipe[0], &timer->wait_set)) {
+			/* On interrupt, we need to calculate how much time is left */
+			clock_gettime(CLOCK_REALTIME, &tv_stop); /* TODO: Alternatives? */
+			memcpy(&tv_delta, &tv_stop, sizeof(struct timespec));
+			timespec_sub(&tv_delta, &tv_start);
+			timespec_sub(&timer->rem, &tv_delta);
+
+			/* pipe is O_NONBLOCK as the 'wait_set' may be unreliable */
+			while (read(timer->wait_pipe[0], (char [1]) { 0 }, 1) == 1) ;
+		} else {
+			/* On timeout return of select(), reset the rem as there's
+			 * nothing to compensate
+			 */
+			memset(&timer->rem, 0, sizeof(struct timespec));
 		}
 
 		/* Interrupt flag means urgent stop of this thread */
@@ -130,7 +200,14 @@ static void *_timer_process(void *arg) {
 		if (!timer->arm.it_interval.tv_sec && !timer->arm.it_interval.tv_nsec)
 			break;
 
-		timespec_add(&timer->arm.it_value, &timer->arm.it_interval);
+		/* Update timer value */
+		if (timer->flags & TIMER_ABSTIME) {
+			/* If absolute, add the interval to the current timer value */
+			timespec_add(&timer->arm.it_value, &timer->arm.it_interval);
+		} else {
+			/* If relative, the interval value is the new timer value */
+			memcpy(&timer->arm.it_value, &timer->arm.it_interval, sizeof(struct timespec));
+		}
 	}
 
 	timer->t_flags |= PSCHED_TIMER_UL_THREAD_WAIT_FLAG;
@@ -320,10 +397,10 @@ int timer_settime_ul(
 
 	/* Check if this timer is to be disarmed or changed */
 	if (_timers[slot].t_flags & PSCHED_TIMER_UL_THREAD_ARMED_FLAG) {
-		/* Cancel the current timer */
+		/* Interrupt the current timer */
 		_timers[slot].t_flags |= PSCHED_TIMER_UL_THREAD_INTR_FLAG;
 
-		pthread_cancel(_timers[slot].t_id);
+		write(_timers[slot].wait_pipe[1], (char [1]) { 0 }, 1);
 
 		/* Acquire the target timer thread mutex, granting that a condition wait occurred */
 		pthread_mutex_lock(&_timers[slot].t_mutex);
@@ -348,6 +425,10 @@ int timer_settime_ul(
 		pthread_cond_destroy(&_timers[slot].t_cond);
 		pthread_mutex_destroy(&_timers[slot].t_mutex);
 
+		/* Close pipe */
+		close(_timers[slot].wait_pipe[0]);
+		close(_timers[slot].wait_pipe[1]);
+
 		/* Cleanup timer entry slot */
 		memset(&_timers[slot].init_time, 0, sizeof(struct timespec));
 		memset(&_timers[slot].rem, 0, sizeof(struct timespec));
@@ -357,6 +438,8 @@ int timer_settime_ul(
 		memset(&_timers[slot].t_cond, 0, sizeof(pthread_cond_t));
 		memset(&_timers[slot].t_mutex, 0, sizeof(pthread_mutex_t));
 		_timers[slot].t_flags = 0;
+		_timers[slot].wait_pipe[0] = 0;
+		_timers[slot].wait_pipe[1] = 0;
 	}
 
 	/* If it this is a disarm operation ... */
@@ -423,7 +506,7 @@ int timer_gettime_ul(timer_t timerid, struct itimerspec *curr_value) {
 	_timers[slot].t_flags |= PSCHED_TIMER_UL_THREAD_READ_FLAG;
 
 	/* Interrupt thread if it's sleeping */
-	pthread_cancel(_timers[slot].t_id);
+	write(_timers[slot].wait_pipe[1], (char [1]) { 0 }, 1);
 
 	/* Acquire the target timer thread mutex, granting that a condition wait occurred */
 	pthread_mutex_lock(&_timers[slot].t_mutex);

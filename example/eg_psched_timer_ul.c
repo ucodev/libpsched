@@ -23,7 +23,7 @@ int main(void) {
 
 	trigger.it_value.tv_sec = time(NULL) + 5;
 	trigger.it_value.tv_nsec = 0;
-	trigger.it_interval.tv_sec = 0;
+	trigger.it_interval.tv_sec = 5;
 	trigger.it_interval.tv_nsec = 0;
 
 	if (timer_create_ul(CLOCK_REALTIME, &sevp, &timer) < 0) {
@@ -38,7 +38,7 @@ int main(void) {
 
 	printf("Waiting for event (Current time: %lu; Expected trigger at: %lu)...\n", (unsigned long) (trigger.it_value.tv_sec - 5), (unsigned long) trigger.it_value.tv_sec);
 
-	usleep(6000000);
+	usleep(16000000);
 
 	timer_delete_ul(timer);
 

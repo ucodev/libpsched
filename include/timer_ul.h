@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Header file for the userland implementation of the timer_*() calls
  *
- * Date: 11-03-2015
+ * Date: 28-03-2015
  * 
  * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -30,6 +30,9 @@
 #include <signal.h>
 #include <time.h>
 #include <pthread.h>
+
+#include <sys/time.h>
+#include <sys/types.h>
 
 #ifdef PSCHED_INTERNAL_TIMER_T
 typedef void * timer_t;
@@ -92,6 +95,8 @@ struct timer_ul {
 	pthread_cond_t t_cond;
 	pthread_mutex_t t_mutex;
 	int t_flags;
+	int wait_pipe[2];
+	fd_set wait_set;
 };
 
 
