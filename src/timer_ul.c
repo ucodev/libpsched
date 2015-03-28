@@ -54,6 +54,8 @@ static void *_notify_routine(void *arg) {
 	sevp->sigev_notify_function(sevp->sigev_value);
 
 	pthread_exit(NULL);
+
+	return NULL;
 }
 
 static int _fd_set_nonblock(int fd) {
