@@ -85,23 +85,21 @@ static void *_timer_process(void *arg) {
 	/* Acquire the lock */
 	pthread_mutex_lock(&timer->t_mutex);
 
-	/* Create the pipe */
-	if (pipe(timer->wait_pipe) < 0)
-		abort(); /* Out of options */
-
-	/* Set the read end of the pipe as non-block */
-	_fd_set_nonblock(timer->wait_pipe[0]);
-
 	/* Mark the timer as ARMED */
-	timer->t_flags |= PSCHED_TIMER_UL_THREAD_ARMED_FLAG;
+	timer->t_flags |= PSCHED_TIMER_UL_THREAD_INIT_FLAG;
 
 	/* Inform that this timer is now armed. NOTE: The mutex release is present before select() */
 	pthread_cond_signal(&timer->t_cond);
 
-	/* It's imperative that timer->rem be set to zero before the first iteration of the loop */
-	memset(&timer->rem, 0, sizeof(struct timespec));
-
 	for (;;) {
+		while (!(timer->t_flags & PSCHED_TIMER_UL_THREAD_ARMED_FLAG))
+			pthread_cond_wait(&timer->t_cond, &timer->t_mutex);
+
+		/* Timer is no longer in initializing state */
+		timer->t_flags &= ~PSCHED_TIMER_UL_THREAD_INIT_FLAG;
+		pthread_cond_signal(&timer->t_cond);
+
+		/* Evaluate timer state */
 		if ((timer->rem.tv_sec <= 0) && (timer->rem.tv_nsec <= 0)) {
 			memset(&timer->rem, 0, sizeof(struct timespec));
 
@@ -170,10 +168,12 @@ static void *_timer_process(void *arg) {
 			memset(&timer->rem, 0, sizeof(struct timespec));
 		}
 
-		/* Interrupt flag means urgent stop of this thread */
+		/* Interrupt flag means urgent restart of the loop to re-evaluate state */
 		if (timer->t_flags & PSCHED_TIMER_UL_THREAD_INTR_FLAG) {
-			/* Let this thread die */
-			break;
+			timer->t_flags &= ~PSCHED_TIMER_UL_THREAD_INTR_FLAG;
+			pthread_cond_signal(&timer->t_cond);
+
+			continue;
 		}
 
 		/* If a read operation was performed, signal the reader that it can now read the
@@ -206,9 +206,15 @@ static void *_timer_process(void *arg) {
 
 		/* TODO: Check if overrun occurred. */
 
-		/* Add the it_interval to it_value, or break the loop if no interval is set */
-		if (!timer->arm.it_interval.tv_sec && !timer->arm.it_interval.tv_nsec)
-			break;
+		/* No remaining time is expected */
+		memset(&timer->rem, 0, sizeof(struct timespec));
+
+		/* Add the it_interval to it_value, or disarm the timer if no interval is set */
+		if (!timer->arm.it_interval.tv_sec && !timer->arm.it_interval.tv_nsec) {
+			timer->t_flags &= ~PSCHED_TIMER_UL_THREAD_ARMED_FLAG;
+			timer->t_flags |= PSCHED_TIMER_UL_THREAD_INIT_FLAG;
+			continue;
+		}
 
 		/* Update timer value */
 		if (timer->flags & TIMER_ABSTIME) {
@@ -220,14 +226,7 @@ static void *_timer_process(void *arg) {
 		}
 	}
 
-	/* Update timer state */
-	timer->t_flags |= PSCHED_TIMER_UL_THREAD_WAIT_FLAG;	/* Waiting for pthread_join() */
-	timer->t_flags &= ~PSCHED_TIMER_UL_THREAD_ARMED_FLAG;	/* Timer no longer armed */
-
-	/* Release the timer mutex */
-	pthread_mutex_unlock(&timer->t_mutex);
-
-	/* All good */
+	/* Unreachable */
 	pthread_exit(NULL);
 
 	return NULL;
@@ -321,6 +320,39 @@ int timer_create_ul(clockid_t clockid, struct sigevent *sevp, timer_t *timerid) 
 	/* Grant that ID is never 0 */
 	*timerid = _timers[slot].id = (timer_t) (uintptr_t) (slot + 1); /* Grant that ID is never 0 */
 
+	/* Initialize timer thread cond and mutex */
+	pthread_mutex_init(&_timers[slot].t_mutex, NULL);
+	pthread_cond_init(&_timers[slot].t_cond, NULL);
+
+	/* Timer mutex shall be acquired before thread is created */
+	pthread_mutex_lock(&_timers[slot].t_mutex);
+
+	/* Create a thread to process this timer */
+	if ((errno = pthread_create(&_timers[slot].t_id, NULL, &_timer_process, &_timers[slot]))) {
+		errsv = errno;
+		pthread_mutex_unlock(&_timers[slot].t_mutex);
+		pthread_mutex_destroy(&_timers[slot].t_mutex);
+		pthread_cond_destroy(&_timers[slot].t_cond);
+		goto _create_failure;
+	}
+
+	/* Create the timer pipe and set the read end as non-block */
+	if ((pipe(_timers[slot].wait_pipe) < 0) || (_fd_set_nonblock(_timers[slot].wait_pipe[0]) < 0)) {
+		pthread_cancel(_timers[slot].t_id);
+		pthread_join(_timers[slot].t_id, NULL);
+		pthread_mutex_unlock(&_timers[slot].t_mutex);
+		pthread_mutex_destroy(&_timers[slot].t_mutex);
+		pthread_cond_destroy(&_timers[slot].t_cond);
+		goto _create_failure; /* Out of options */
+	}
+
+	/* Wait for the newly created timer inform that it's in initialized state */
+	while (!(_timers[slot].t_flags & PSCHED_TIMER_UL_THREAD_INIT_FLAG))
+		pthread_cond_wait(&_timers[slot].t_cond, &_timers[slot].t_mutex);
+
+	/* Release the timer mutex */
+	pthread_mutex_unlock(&_timers[slot].t_mutex);
+
 	/* Release timers critical region lock */
 	pthread_mutex_unlock(&_mutex_timers);
 
@@ -352,6 +384,18 @@ int timer_delete_ul(timer_t timerid) {
 	if (timer_settime_ul(timerid, 0, &disarm, NULL) < 0)
 		return -1;
 
+	/* Cancel the timer thread and wait for it to join */
+	pthread_cancel(_timers[slot].t_id);
+	pthread_join(_timers[slot].t_id, NULL);
+
+	/* Destroy mutexes */
+	pthread_cond_destroy(&_timers[slot].t_cond);
+	pthread_mutex_destroy(&_timers[slot].t_mutex);
+
+	/* Close pipe */
+	close(_timers[slot].wait_pipe[0]);
+	close(_timers[slot].wait_pipe[1]);
+
 	/* Cleanup timer data */
 	memset(&_timers[slot], 0, sizeof(struct timer_ul));
 
@@ -360,11 +404,6 @@ int timer_delete_ul(timer_t timerid) {
 
 	/* Check if the list is still being used, and peform some cleanup */
 	for (i = 0; i < _nr_timers; i ++) {
-		if (_timers[i].t_flags & PSCHED_TIMER_UL_THREAD_WAIT_FLAG) {
-			pthread_join(_timers[i].t_id, NULL);
-			memset(&_timers[i], 0, sizeof(struct timer_ul));
-		}
-
 		if (_timers[i].id) {
 			used = 1;
 			break;
@@ -408,60 +447,45 @@ int timer_settime_ul(
 	/* Acquire timers critical region lock */
 	pthread_mutex_lock(&_mutex_timers);
 
-	/* Check if this timer is to be disarmed or changed */
-	if (_timers[slot].t_flags & PSCHED_TIMER_UL_THREAD_ARMED_FLAG) {
-		/* Interrupt the current timer */
-		_timers[slot].t_flags |= PSCHED_TIMER_UL_THREAD_INTR_FLAG;
+	/* Acquire the target timer thread mutex */
+	pthread_mutex_lock(&_timers[slot].t_mutex);
 
+	/* Check if this timer shall be disarmed */
+	if (_timers[slot].t_flags & PSCHED_TIMER_UL_THREAD_ARMED_FLAG) {
+		/* Disarm timer */
+		_timers[slot].t_flags &= ~PSCHED_TIMER_UL_THREAD_ARMED_FLAG;
+		_timers[slot].t_flags |= PSCHED_TIMER_UL_THREAD_INIT_FLAG;
+
+		/* Interrupt timer */
 		write(_timers[slot].wait_pipe[1], (char [1]) { 0 }, 1);
 
-		/* Acquire the target timer thread mutex, granting that a condition wait occurred */
-		pthread_mutex_lock(&_timers[slot].t_mutex);
+		_timers[slot].t_flags |= PSCHED_TIMER_UL_THREAD_INTR_FLAG;
+
+		/* Wait for interrupt to occur */
+		while (_timers[slot].t_flags & PSCHED_TIMER_UL_THREAD_INTR_FLAG)
+			pthread_cond_wait(&_timers[slot].t_cond, &_timers[slot].t_mutex);
 
 		/* Copy last known value and interval */
 		if (old_value)
 			memcpy(old_value, &_timers[slot].arm, sizeof(struct itimerspec));
-
-		/* We're done with reads */
-		/*_timers[slot].t_flags &= ~PSCHED_TIMER_UL_THREAD_INTR_FLAG; */
-
-		/* Release the target timer thread mutex */
-		pthread_mutex_unlock(&_timers[slot].t_mutex);
-
-		/* Wait for thread termination */
-		pthread_join(_timers[slot].t_id, NULL);
-
-		/* Destroy mutexes */
-		pthread_cond_destroy(&_timers[slot].t_cond);
-		pthread_mutex_destroy(&_timers[slot].t_mutex);
-
-		/* Close pipe */
-		close(_timers[slot].wait_pipe[0]);
-		close(_timers[slot].wait_pipe[1]);
-
-		/* Cleanup timer entry slot */
-		memset(&_timers[slot].init_time, 0, sizeof(struct timespec));
-		memset(&_timers[slot].rem, 0, sizeof(struct timespec));
-		memset(&_timers[slot].arm, 0, sizeof(struct timespec));
-		_timers[slot].overruns = 0;
-		memset(&_timers[slot].t_id, 0, sizeof(pthread_t));
-		memset(&_timers[slot].t_cond, 0, sizeof(pthread_cond_t));
-		memset(&_timers[slot].t_mutex, 0, sizeof(pthread_mutex_t));
-		_timers[slot].t_flags = 0;
-		_timers[slot].wait_pipe[0] = 0;
-		_timers[slot].wait_pipe[1] = 0;
 	}
 
 	/* If it this is a disarm operation ... */
 	if (!new_value->it_value.tv_sec && !new_value->it_value.tv_nsec) {
+		pthread_mutex_unlock(&_timers[slot].t_mutex);
 		pthread_mutex_unlock(&_mutex_timers);
 
 		return 0;
 	}
 
+	/* Reset timer state */
+	memset(&_timers[slot].rem, 0, sizeof(struct timespec));
+	memset(&_timers[slot].arm, 0, sizeof(struct itimerspec));
+
 	/* Set the init time */
 	if (clock_gettime(_timers[slot].clockid, &_timers[slot].init_time) < 0) {
 		errsv = errno;
+		pthread_mutex_unlock(&_timers[slot].t_mutex);
 		goto _settime_failure;
 	}
 
@@ -471,24 +495,13 @@ int timer_settime_ul(
 	/* Copy the timer values */
 	memcpy(&_timers[slot].arm, new_value, sizeof(struct itimerspec));
 
-	/* Initialize thread cond and mutex */
-	pthread_mutex_init(&_timers[slot].t_mutex, NULL);
-	pthread_cond_init(&_timers[slot].t_cond, NULL);
+	_timers[slot].t_flags |= PSCHED_TIMER_UL_THREAD_ARMED_FLAG;
 
-	/* Timer mutex shall be acquired before thread is created */
-	pthread_mutex_lock(&_timers[slot].t_mutex);
+	pthread_cond_signal(&_timers[slot].t_cond);
 
-	/* Create a thread to process this timer */
-	if (pthread_create(&_timers[slot].t_id, NULL, &_timer_process, &_timers[slot])) {
-		errsv = errno;
-		goto _settime_failure;
-	}
-
-	/* Wait for the newly created timer inform that it is armed */
-	while (!(_timers[slot].t_flags & PSCHED_TIMER_UL_THREAD_ARMED_FLAG))
+	while (_timers[slot].t_flags & PSCHED_TIMER_UL_THREAD_INIT_FLAG)
 		pthread_cond_wait(&_timers[slot].t_cond, &_timers[slot].t_mutex);
 
-	/* Release the timer mutex */
 	pthread_mutex_unlock(&_timers[slot].t_mutex);
 
 	/* Release timers critical region lock */
