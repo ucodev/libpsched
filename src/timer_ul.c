@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        A userland implementation of the timer_*() calls
  *
- * Date: 28-03-2015
+ * Date: 29-03-2015
  * 
  * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -401,7 +401,7 @@ int timer_settime_ul(
 	}
 
 	if (!new_value) {
-		errno = EINVAL;
+		errno = EFAULT;
 		return -1;
 	}
 
