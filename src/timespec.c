@@ -3,9 +3,9 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Timespec interface
  *
- * Date: 11-06-2014
+ * Date: 30-03-2015
  * 
- * Copyright 2014 Pedro A. Hortas (pah@ucodev.org)
+ * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
  * This file is part of libpsched.
  *
@@ -28,10 +28,16 @@
 #include <time.h>
 
 void timespec_sub(struct timespec *dest, const struct timespec *src) {
-	long tmp = dest->tv_nsec - src->tv_nsec;
+	long long tmp = dest->tv_nsec - src->tv_nsec;
+	long long sub = dest->tv_sec - src->tv_sec - (tmp < 0);
 
-	dest->tv_sec = dest->tv_sec - src->tv_sec - (tmp < 0);
-	dest->tv_nsec = (tmp < 0) ? 1000000000 + tmp : tmp;
+	if (sub < 0) {
+		dest->tv_sec = 0;
+		dest->tv_nsec = 0;
+	} else {
+		dest->tv_sec = sub;
+		dest->tv_nsec = (tmp < 0) ? 1000000000 + tmp : tmp;
+	}
 }
 
 void timespec_add(struct timespec *dest, const struct timespec *src) {

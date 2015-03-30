@@ -3,7 +3,7 @@
  * @brief Portable Scheduler Library (libpsched)
  *        Header file for the userland implementation of the timer_*() calls
  *
- * Date: 29-03-2015
+ * Date: 30-03-2015
  * 
  * Copyright 2014-2015 Pedro A. Hortas (pah@ucodev.org)
  *
@@ -93,7 +93,8 @@ struct timer_ul {
 
 	/* Thread specific */
 	pthread_t t_id;
-	pthread_cond_t t_cond;
+	pthread_cond_t t_cond_h;
+	pthread_cond_t t_cond_p;
 	pthread_mutex_t t_mutex;
 	int t_flags;
 	int wait_pipe[2];
