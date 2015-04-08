@@ -80,8 +80,10 @@ void event_process(psched_t *handler) {
 		if (handler->threaded) pthread_mutex_unlock(&handler->event_mutex);
 
 		/* Validate if entry isn't expired */
-		if ((entry->expire.tv_sec || entry->expire.tv_nsec) && (timespec_cmp(&tp_now, &entry->expire) >= 0))
+		if ((entry->expire.tv_sec || entry->expire.tv_nsec) && (timespec_cmp(&tp_now, &entry->expire) >= 0)) {
+			/* TODO: Expiration checks should be performed after step addition */
 			entry->expired = 1;
+		}
 
 		/* If no step defined or if expired, set it to be removed */
 		if (entry->expired) {
